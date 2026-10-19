@@ -37,7 +37,9 @@ and undocumented, so the protocol is learnt from the live link first.
      controller ([control](control.md)): Proteus' start-up replayed byte for
      byte, the stream, Peak and break detection switches, disconnect; an
      allowlist with no motion command; keypad STOP and every way out hand
-     control back. Not yet run on the press.
+     control back. **Run on the press 2026-10-19** (steps 24, 25): PC on the
+     display, readings live, PK/BD following the switches, keypad back after
+     Disconnect.
    - **3b. Motion.** START / PAUSE / CONTINUE / STOP as the operator named them
      ([the window](ui.md#the-control-window)); ramp limits enforced before START;
      the controller's `#B02` (ramp end) answered with `#B26` and Cancel, as

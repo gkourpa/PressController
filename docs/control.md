@@ -9,7 +9,7 @@ disconnects.
 1. Leave the old PC as it is; it stays the fallback.
 2. Take the controller cable off the Y-cable (or the old PC) and plug it
    **straight into the adapter named in the press file's `[control] port`**
-   (the lab: Digitus "B", COM6). The tap is not needed in control mode: the
+   (the lab: Digitus "A", COM7). The tap is not needed in control mode: the
    program records both directions itself.
 3. The press idle, nobody at it.
 4. `python -m presscontroller.app --control`, and confirm the dialog.

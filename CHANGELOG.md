@@ -10,7 +10,8 @@ What each version added or changed, newest first.
   with the old PC unplugged — Proteus' start-up replayed exactly, the live
   readings, Peak and break detection as on/off switches, disconnect. It cannot
   send anything that moves the press. Pressing STOP on the controller's keypad
-  hands control back to the keypad at once.
+  hands control back to the keypad at once. Run on the press on 2026-10-19: the
+  controller answered exactly as it answers Proteus.
 - The press file's `[limits]`: the fastest path and force ramps allowed. The
   monitor says so the moment a faster ramp is sent.
 

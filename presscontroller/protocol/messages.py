@@ -190,7 +190,7 @@ COMMANDS: dict[tuple[str, int], Meaning] = {
     (PC_TO_CTRL, 17): Meaning("Cancel: pump off, test ends", True),
     (PC_TO_CTRL, 18): Meaning("PAUSE / CONTINUE (toggles; freezes the ramp's target)", True),
     (PC_TO_CTRL, 20): Meaning("PC mode on", False),
-    (PC_TO_CTRL, 21): Meaning("PC mode off", False),
+    (PC_TO_CTRL, 21): Meaning("PC mode off", True),
     (PC_TO_CTRL, 22): Meaning("start the ramp", True),
     (PC_TO_CTRL, 23): Meaning("start the approach", True),
     (PC_TO_CTRL, 26): Meaning("test finished (answer to ramp end)", False),

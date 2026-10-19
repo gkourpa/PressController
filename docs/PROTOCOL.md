@@ -318,6 +318,15 @@ Operator procedure after a test: exit the test in Proteus, then press **STOP on 
   Proteus showed 0.0. → **Zero is a software tare inside Proteus.** A replacement app must do its own
   tare (subtract the raw value at the moment of zeroing).
 
+### Control mode: this program in Proteus' place, 2026-10-19, `captures/20261019_174926_step24_control_connect.jsonl`, `…175412_step25_control_connect_again.jsonl`
+
+The old PC unplugged; the controller cable straight into a Digitus adapter (COM7). This program sent
+Proteus' start-up byte for byte and the controller answered **exactly as it answered Proteus in every
+recording** (`#O`; `#D138.6 #D104000`; `#D140 #D180`), then streamed at 10 Hz without a gap. Operator:
+**PC** appeared on connecting; **PK** and **BD** followed `#B31/#B30` and `#B32/#B33`; after
+Disconnect (`#B36 #B21` only) **PC** went away and the keypad worked again (STOP → SINKING). Both
+sessions identical.
+
 ## From Proteus' own program (installation CD)
 
 The operator found Proteus' installation CD (Proteus 2.4.5, Wüst, 2003) on 2026-10-19; its contents
@@ -387,7 +396,7 @@ nothing that lowers the piston.
 | `#B43` | CTRL | test over, load released | hypothesis |
 | `#B17` | PC | Cancel: pump off, test ends | confirmed |
 | `#B18` | PC | PAUSE / CONTINUE, toggling; freezes the ramp's target, so it does not hold a piston that lags it | confirmed (steps 22, 23) |
-| `#B20` / `#B21` | PC | PC mode on / off | hypothesis |
+| `#B20` / `#B21` | PC | PC mode on / off | `#B21` confirmed (step 24: `#B36 #B21` alone clears **PC** from the display and frees the keypad); `#B20` hypothesis |
 | `#B22` | PC | start the ramp | confirmed |
 | `#B23` | PC | start the approach | confirmed |
 | `#B26` | PC | test finished, sent in answer to `#B02` | hypothesis (step 21) |
