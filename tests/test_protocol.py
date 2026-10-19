@@ -17,6 +17,7 @@ from presscontroller.protocol import (
     Unknown,
     describe,
     parse,
+    rate_text,
 )
 from presscontroller.protocol.lines import MAX_LINE
 
@@ -89,14 +90,30 @@ def test_anything_else_is_kept_verbatim():
     assert parse(CTRL_TO_PC, "") == Unknown("")
 
 
-def test_ramp_units():
-    assert Ramp(167, 0, 100000, 0, 1).speed_mm_min == pytest.approx(10.02)
-    assert Ramp(100, 79446, 100000, 0, 1).speed_mm_min == pytest.approx(6.0)
+def test_ramp_numbers_are_thousandths_of_the_channel_unit():
+    path = Ramp(167, 0, 100000, 0, 1)            # 10 mm/min to 100 mm
+    assert path.rate * 60 == pytest.approx(10.02) and path.end_value == 100.0
+    force = Ramp(5000, 0, 300000, 0, 0)          # 5 kN/s to 300 kN
+    assert force.rate == 5.0 and force.end_value == 300.0
 
 
-def test_a_ramp_off_the_path_channel_is_not_read_as_millimetres():
-    text = describe(PC_TO_CTRL, Ramp(5000, 0, 300000, 0, 0))
-    assert "channel 0" in text and "units not decoded" in text and "mm/min" not in text
+def test_rates_are_told_as_tests_are_set():
+    assert rate_text(10.02 / 60, "mm") == "10 mm/min"
+    assert rate_text(5.028, "kN") == "5.03 kN/s"
+
+
+def test_a_ramp_is_told_in_its_own_channel_unit():
+    units = {0: "kN", 1: "mm", 2: "mm"}
+    assert describe(PC_TO_CTRL, Ramp(5000, 0, 300000, 0, 0), units) == (
+        "ramp on channel 0: 5 kN/s from 0 to 300 kN")
+    assert describe(PC_TO_CTRL, Ramp(100, 79446, 100000, 0, 1), units) == (
+        "ramp on channel 1: 6 mm/min from 79.446 to 100 mm")
+
+
+def test_a_ramp_on_an_unconfirmed_channel_is_given_raw():
+    text = describe(PC_TO_CTRL, Ramp(50, 0, 1000, 0, 2), {2: "mm"})
+    assert "channel 2" in text and "units not decoded" in text and "mm" not in text
+    assert "units not decoded" in describe(PC_TO_CTRL, Ramp(5000, 0, 300000, 0, 0))
 
 
 def test_descriptions_mark_a_guess_with_a_question_mark():

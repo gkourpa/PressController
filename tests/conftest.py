@@ -2,7 +2,7 @@
 
 Ordinary tests never open a serial port and never touch the operator's settings.
 The captures in ``tests/data`` are real recordings from the tap
-(docs/PROTOCOL.md, steps 13, 15, 16 and 17), so the monitor is tested on what the
+(docs/PROTOCOL.md, steps 13, 15, 16, 17 and 20), so the monitor is tested on what the
 press really said.
 """
 
@@ -23,6 +23,8 @@ RAMP_6 = DATA / "ramp_6mm_min.jsonl"
 #: Step 17, the monitor's first live run: 3 mm/min, ramp start sent as twice
 #: the piston position, speed unaffected.
 RAMP_3 = DATA / "ramp_3mm_min_start_doubled.jsonl"
+#: Step 20: a force-controlled ramp, 5 kN/s to 300 kN, stopped at 247 kN.
+FORCE_5 = DATA / "force_5kn_s.jsonl"
 #: Step 13: START with no specimen, then Cancel during the approach.
 DRY_RUN = DATA / "dryrun_start_cancel.jsonl"
 

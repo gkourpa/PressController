@@ -35,7 +35,7 @@ def test_mid_test_the_window_shows_the_ramp_and_its_warning(qapp, press):
         assert win.phase_lbl.text() == "ramp"
         assert win.link_lbl.text().startswith("connected (PC mode), data every 200 ms")
         assert win.peak_gauge.reading.text() == "1515.88 kN"
-        assert "set 10 mm/min · measured 2.0" in win.ramp_lbl.text()
+        assert "Path control: set 10 mm/min · measured 2.0" in win.ramp_lbl.text()
         assert "piston was at 79.451 mm" in win.ramp_lbl.text()
         assert "not the 10 mm/min set" in win.message.text()
         assert win.gauges[0].reading.text().endswith(" kN")
@@ -132,5 +132,25 @@ def test_the_start_sent_is_a_plain_note_on_the_ramp_line(qapp, press):
         text = win.ramp_lbl.text()
         assert "start sent 159.202 mm, piston was at 79.600 mm" in text
         assert "Warning" not in text and win.ramp_lbl.styleSheet() == ""
+    finally:
+        win.close()
+
+
+def test_a_force_ramp_on_the_ramp_line(qapp, press):
+    """Step 20: set and measured in kN/s, the end force, the path's rate beside."""
+    from presscontroller.app.main_window import MainWindow
+    from tests.conftest import FORCE_5
+    src = ReplayTap(FORCE_5, speed=1e9)
+    src._events = [e for e in src._events if e.t < 150.0]    # ramp running, before Stop
+    win = MainWindow(Monitor(press), src)
+    win.start()
+    win._timer.stop()
+    try:
+        win.tick()
+        win._display.flush()
+        text = win.ramp_lbl.text()
+        assert text.startswith("Force control: set 5 kN/s · measured 5.0")
+        assert "to 300.00 kN; start sent 0.00 kN; path 4." in text
+        assert "Warning" not in text
     finally:
         win.close()

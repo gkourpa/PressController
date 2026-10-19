@@ -50,7 +50,7 @@ from presscontroller.app.plot import render_force_displacement
 from presscontroller.app.theme import styled, text_style
 from presscontroller.app.widgets import Coalescer, Gauge, MessageIsland, PlotView, island
 from presscontroller.monitor import Monitor, write_test_csv
-from presscontroller.protocol import PC_TO_CTRL
+from presscontroller.protocol import PC_TO_CTRL, rate_text
 
 #: How often the source is polled. Lines are timestamped when they arrive, not
 #: when they are polled, so this only sets how soon the window shows them.
@@ -251,25 +251,24 @@ class MainWindow(QMainWindow):
             else:
                 r = test.ramp
                 settled = test.ramp_seconds >= 2
-                if test.path_ramp:
-                    measured = test.ramp_mm_min
-                    text = f"set {r.speed_mm_min:.3g} mm/min"
-                    text += (f" · measured {measured:.2f} mm/min ({test.ramp_seconds:.0f} s)"
-                             if measured is not None and settled else " · measuring…")
-                    text += (f"\nto {r.end_um / 1000:.3f} mm; start sent "
-                             f"{r.start_um / 1000:.3f} mm")
-                    if test.ramp_from_mm is not None:
-                        text += f", piston was at {test.ramp_from_mm:.3f} mm"
-                else:
-                    ch = press.channel(r.channel)
-                    name = ch.name if ch else f"channel {r.channel}"
-                    kn_s, mm_min = test.ramp_kn_s, test.ramp_mm_min
-                    text = f"{name} control (not decoded yet): speed field {r.speed_um_s}"
-                    text += (f"\nmeasured {kn_s:.2f} kN/s, path {mm_min:.2f} mm/min "
+                ch = press.channel(r.channel)
+                if m.ramp_decoded(test):
+                    unit, places = ch.unit, ch.decimals
+                    measured = m.ramp_measured(test)
+                    text = f"{ch.name} control: set {rate_text(r.rate, unit)}"
+                    text += (f" · measured {rate_text(measured, unit)} "
                              f"({test.ramp_seconds:.0f} s)"
-                             if kn_s is not None and mm_min is not None and settled
-                             else "\nmeasuring…")
-                    text += f"\nstart field {r.start_um}, end field {r.end_um}"
+                             if measured is not None and settled else " · measuring…")
+                    text += (f"\nto {r.end_value:.{places}f} {unit}; start sent "
+                             f"{r.start_value:.{places}f} {unit}")
+                    if r.channel == m.path_index and test.ramp_from_mm is not None:
+                        text += f", piston was at {test.ramp_from_mm:.3f} mm"
+                    elif test.ramp_mm_min is not None and settled:
+                        text += f"; path {test.ramp_mm_min:.2f} mm/min"
+                else:
+                    name = ch.name if ch else f"channel {r.channel}"
+                    text = f"{name} control (not decoded yet): speed field {r.speed}"
+                    text += f"\nstart field {r.start}, end field {r.end}"
                 if test.warnings:
                     text += "\nWarning: " + test.warnings[-1]
                 self.ramp_lbl.setText(text)

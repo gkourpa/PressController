@@ -24,6 +24,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from presscontroller.monitor.tracker import Monitor, TestRecord
+from presscontroller.protocol import rate_text
 
 
 def format_value(v: float | None) -> str:
@@ -70,8 +71,14 @@ def write_test_csv(monitor: Monitor, test: TestRecord, folder: str | Path, *,
         header.append(f"heard from: {source}")
     if test.ramp is not None:
         r = test.ramp
-        header.append(f"ramp sent: {r.speed_um_s} um/s ({r.speed_mm_min:.3g} mm/min) from "
-                      f"{r.start_um} um to {r.end_um} um, field4 {r.field4}, channel {r.channel}"
+        ch = press.channel(r.channel)
+        decoded = monitor.ramp_decoded(test)
+        header.append(f"ramp sent: channel {r.channel}"
+                      + (f" ({ch.name})" if ch else "")
+                      + f", speed {r.speed}, start {r.start}, end {r.end}, field4 {r.field4}"
+                      + (f" = {rate_text(r.rate, ch.unit)} from {r.start_value:g} to "
+                         f"{r.end_value:g} {ch.unit} (thousandths of {ch.unit})"
+                         if decoded else " (units not decoded for this channel)")
                       + (f"; piston at {test.ramp_from_mm:.3f} mm when sent"
                          if test.ramp_from_mm is not None else ""))
     if test.ramp_mm_min is not None:

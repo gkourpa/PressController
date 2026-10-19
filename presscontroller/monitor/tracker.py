@@ -34,7 +34,7 @@ from enum import Enum
 from presscontroller.config.press import FORCE, PATH, PressConfig
 from presscontroller.protocol import (
     CTRL_TO_PC,
-    PATH_CHANNEL,
+    DECODED_RAMP_CHANNELS,
     PC_TO_CTRL,
     Command,
     Ramp,
@@ -43,6 +43,7 @@ from presscontroller.protocol import (
     Unknown,
     describe,
     parse,
+    rate_text,
 )
 from presscontroller.tap.events import TapEvent
 
@@ -167,15 +168,9 @@ class TestRecord:
 
     @property
     def ramp_kn_s(self) -> float | None:
-        """The rate force has really risen at over the ramp so far, in kN/s —
-        what a force-controlled ramp is judged by, once its units are known."""
+        """The rate force has really risen at over the ramp so far, in the force
+        channel's unit per second — what a force-controlled ramp is judged by."""
         return _slope(self._fit_force)
-
-    @property
-    def path_ramp(self) -> bool:
-        """Whether the ramp is on the path channel, the only one whose speed is
-        decoded (mm/min) and so the only one judged."""
-        return self.ramp is not None and self.ramp.channel == PATH_CHANNEL
 
 
 def _slope(sums: list[float]) -> float | None:
@@ -218,6 +213,7 @@ class Monitor:
         self._recent: deque[tuple[float, dict[int, int]]] = deque()
         self._closed: list[TestRecord] = []
         self.unknown_lines = 0
+        self._units = {c.index: c.unit for c in press.channels}
         f, p = press.by_name(FORCE), press.by_name(PATH)
         self.force_index = f.index if f else None
         self.path_index = p.index if p else None
@@ -300,6 +296,24 @@ class Monitor:
             at = (peak[2] - origin, peak[0])
         return ForceDisplacement(xs, forces[i0:], at, origin)
 
+    def ramp_decoded(self, test: TestRecord | None) -> bool:
+        """Whether ``test``'s ramp is on a channel whose units are confirmed and
+        that this monitor measures (force or path) — the only ramps judged."""
+        return (test is not None and test.ramp is not None
+                and test.ramp.channel in DECODED_RAMP_CHANNELS
+                and test.ramp.channel in (self.force_index, self.path_index)
+                and self.press.channel(test.ramp.channel) is not None)
+
+    def ramp_measured(self, test: TestRecord | None) -> float | None:
+        """The controlled channel's measured rate over the ramp, in its unit per
+        second — comparable with :attr:`Ramp.rate`."""
+        if not self.ramp_decoded(test):
+            return None
+        if test.ramp.channel == self.path_index:
+            mm_min = test.ramp_mm_min
+            return None if mm_min is None else mm_min / 60.0
+        return test.ramp_kn_s
+
     def rate(self, index: int | None) -> float | None:
         """Units per second over the last :data:`RATE_WINDOW_S`, or ``None``."""
         if index is None or len(self._recent) < 2:
@@ -321,7 +335,7 @@ class Monitor:
         if isinstance(msg, Sample):
             return self._sample(ev, msg)
         known = not isinstance(msg, Unknown)
-        meaning = describe(ev.direction, msg)
+        meaning = describe(ev.direction, msg, self._units)
         who = "PC" if ev.direction == PC_TO_CTRL else "controller"
         self.log.append(LogEntry(ev.t, ev.wall, ev.direction, ev.text, meaning, known))
         self.log_total += 1
@@ -367,22 +381,24 @@ class Monitor:
         """Once, after :data:`RAMP_JUDGE_AFTER_S` of ramp: say so if the press is
         not loading at the speed that was set.
 
-        Only a path ramp is judged. A ramp on another channel — force control —
-        has a speed field whose unit has not been decoded yet, and comparing it
-        with millimetres per minute would be a false alarm; its measured rate is
-        shown instead, which is also how its unit will be worked out.
+        Path and force ramps are judged, each against its own channel: position
+        in mm/min, force in kN/s. A ramp on a channel whose units are not
+        confirmed is not — comparing a number in an unknown unit would be a
+        false alarm.
         """
-        if (test.ramp_judged or not test.path_ramp
+        if (test.ramp_judged or not self.ramp_decoded(test)
                 or test.ramp_seconds < RAMP_JUDGE_AFTER_S):
             return []
         test.ramp_judged = True
-        measured, wanted = test.ramp_mm_min, test.ramp.speed_mm_min
+        measured, wanted = self.ramp_measured(test), test.ramp.rate
         if measured is None or wanted <= 0:
             return []
         if abs(measured - wanted) <= RAMP_SPEED_TOLERANCE * wanted:
             return []
-        text = (f"The ramp is running at {measured:.2f} mm/min, not the {wanted:.3g} mm/min "
-                f"set (measured over its first {test.ramp_seconds:.0f} s).")
+        unit = self.press.channel(test.ramp.channel).unit
+        text = (f"The ramp is running at {rate_text(measured, unit)}, not the "
+                f"{rate_text(wanted, unit)} set (measured over its first "
+                f"{test.ramp_seconds:.0f} s).")
         test.warnings.append(text)
         return [Notice(text, warn=True)]
 

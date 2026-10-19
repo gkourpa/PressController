@@ -32,8 +32,8 @@ def test_the_real_test_as_csv(press, tmp_path):
     for r in rows[::200]:
         assert float(r["Path_mm"]) == pytest.approx(int(r["Path_raw"]) * 100 / 600000)
     assert any("#B22" in r["event"] for r in rows)
-    assert any(c.startswith("# ramp sent: 167 um/s") for c in comments)
-    assert any(c.startswith("# ramp sent: 167 um/s (10 mm/min) from 0 um")
+    assert any(c.startswith("# ramp sent: channel 1 (Path), speed 167, start 0, end 100000, "
+                            "field4 0 = 10 mm/min from 0 to 100 mm (thousandths of mm)")
                and c.endswith("piston at 79.451 mm when sent") for c in comments)
     assert any(c.startswith("# warning: The ramp is running at") for c in comments)
     assert any(c.startswith("# ramp measured: 2.06") for c in comments)

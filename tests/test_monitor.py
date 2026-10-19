@@ -10,7 +10,7 @@ from presscontroller.monitor import Monitor, Phase
 from presscontroller.monitor.tracker import RAMP_JUDGE_AFTER_S, RAMP_SPEED_TOLERANCE
 from presscontroller.protocol import CTRL_TO_PC, PC_TO_CTRL, Ramp
 from presscontroller.tap import TapEvent, read_capture
-from tests.conftest import DRY_RUN, RAMP_3, RAMP_6, REAL_TEST, replay_all
+from tests.conftest import DRY_RUN, FORCE_5, RAMP_3, RAMP_6, REAL_TEST, replay_all
 
 
 def test_the_real_test_is_one_test_with_its_peak(press):
@@ -63,7 +63,7 @@ def test_a_start_off_the_piston_is_kept_but_not_warned_about(press):
     m, notices = replay_all(press, RAMP_3)
     test = m.tests[0]
     assert test.ramp == Ramp(50, 159202, 100000, 0, 1)
-    assert test.ramp.start_um / 1000 / test.ramp_from_mm == pytest.approx(2.0, abs=1e-4)
+    assert test.ramp.start_value / test.ramp_from_mm == pytest.approx(2.0, abs=1e-4)
     assert test.ramp_mm_min == pytest.approx(3.0, abs=0.1)
     assert test.warnings == []
     assert not any(n.warn for n in notices)
@@ -186,14 +186,14 @@ def test_no_test_no_curve(press):
     assert fd.displacement == [] and fd.force == [] and fd.peak is None
 
 
-def _force_ramp(press, rate_kn_s=5.0, seconds=15.0):
+def _force_ramp(press, rate_kn_s=5.0, seconds=15.0, speed_field=5000):
     """A force ramp as it might be heard: channel 0, force rising, path creeping."""
     m = Monitor(press)
     w = datetime(2026, 1, 1)
     feed = lambda t, d, text: m.feed(TapEvent(t, w, d, text))
     notices = []
     for t, d, text in [(0.0, PC_TO_CTRL, "#B47"), (0.1, PC_TO_CTRL, "#B23"),
-                       (1.0, CTRL_TO_PC, "#B01"), (2.0, PC_TO_CTRL, "#D125000;0;300000;0;0"),
+                       (1.0, CTRL_TO_PC, "#B01"), (2.0, PC_TO_CTRL, f"#D12{speed_field};0;300000;0;0"),
                        (2.1, PC_TO_CTRL, "#B22")]:
         notices += feed(t, d, text)
     k = 0
@@ -206,13 +206,27 @@ def _force_ramp(press, rate_kn_s=5.0, seconds=15.0):
     return m, notices
 
 
-def test_a_force_ramp_is_measured_in_kn_per_s_and_not_judged_in_mm(press):
+def test_a_force_ramp_at_its_rate_is_measured_in_kn_per_s_and_passes(press):
     m, notices = _force_ramp(press, rate_kn_s=5.0)
     test = m.tests[0]
-    assert test.ramp.channel == 0 and not test.path_ramp
-    assert test.ramp_kn_s == pytest.approx(5.0, abs=0.01)
+    assert m.ramp_decoded(test) and test.ramp.channel == m.force_index
+    assert m.ramp_measured(test) == pytest.approx(5.0, abs=0.01)
     assert test.ramp_mm_min == pytest.approx(0.6, abs=0.01)
-    # 5000 is no millimetre speed; comparing it with mm/min would be a false alarm.
     assert test.warnings == [] and not any(n.warn for n in notices)
-    assert "units not decoded" in m.log[-1].meaning or any(
-        "units not decoded" in e.meaning for e in m.log)
+    assert any(e.meaning == "ramp on channel 0: 5 kN/s from 0 to 300 kN" for e in m.log)
+
+
+def test_a_force_ramp_off_its_rate_is_said_in_kn_per_s(press):
+    m, notices = _force_ramp(press, rate_kn_s=3.0, speed_field=5000)
+    [warning] = m.tests[0].warnings
+    assert warning.startswith("The ramp is running at 3 kN/s, not the 5 kN/s set")
+
+
+def test_the_real_force_ramp(press):
+    # Step 20: 5 kN/s to 300 kN set in Proteus, stopped at 247 kN.
+    m, notices = replay_all(press, FORCE_5)
+    test = m.tests[0]
+    assert test.ramp == Ramp(5000, 0, 300000, 0, 0)
+    assert m.ramp_measured(test) == pytest.approx(5.03, abs=0.01)
+    assert test.warnings == [] and not any(n.warn for n in notices)
+    assert m.peak(test)[0] == pytest.approx(247.27, abs=0.01)

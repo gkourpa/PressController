@@ -182,7 +182,10 @@ Start-up identical for the 3rd time. Then (t = seconds from recording start):
 **Keypad STOP in PC mode is forwarded as `#B28` instead of acting locally** — a replacement app
 must handle it (at minimum: stop/cancel the test). After `#B21` the keypad works locally again.
 
-#### Ramp command `#D12<speed>;<start>;<end>;0;<channel>` — decoded 2026-10-19
+#### Ramp command `#D12<speed>;<start>;<end>;0;<channel>` — decoded 2026-10-19 (path), step 20 (force)
+
+**All numbers are thousandths of the controlled channel's unit**, and the last field is the controlled
+channel, numbered as in the stream: µm/s and µm on Path (channel 1), N/s and N on Force (channel 0).
 
 | Test | Template speed | Command | Measured path rate |
 |---|---|---|---|
@@ -191,12 +194,12 @@ must handle it (at minimum: stop/cancel the test). After `#B21` the keypad works
 
 | Field | Meaning | Status |
 |---|---|---|
-| `#D12` | ramp command | hypothesis (only form seen) |
-| `167` / `100` | **speed in µm/s** (10 mm/min = 166.7, 6 mm/min = 100) | **confirmed** |
-| `0` / `79446` | **ramp start position in µm** (79446 = path at CONTINUE, 79.446 mm) | confirmed for step 16 |
-| `100000` | **ramp end position in µm** (template End 100.000 mm) | confirmed |
+| `#D12` | ramp command | confirmed for path and force (same form) |
+| speed | thousandths of the channel unit per second: **µm/s** (167 = 10 mm/min, 100 = 6, 50 = 3, 17 = 1) and **N/s** (5000 = 5 kN/s, ran at 5.03) | **confirmed** |
+| start | thousandths of the channel unit; what Proteus puts here is not understood and it does not set the speed (below) | unit only |
+| end | thousandths of the channel unit: 100000 = 100.000 mm, 300000 = 300 kN (template End) | **confirmed** |
 | `0` | ? | unknown |
-| `1` | control channel (1 = Path)? | hypothesis |
+| channel | the controlled channel, as numbered in the stream: **1 = Path, 0 = Force** | **confirmed** (step 20) |
 
 **Step 17** (first live run of the monitor, `captures/20261019_155241_step17_live_monitor_3mm_min.jsonl`,
 template 3 mm/min): `#D1250;159202;100000;0;1` — speed 50 µm/s = 3 mm/min, but start **159.202 mm =
@@ -229,6 +232,14 @@ piston at 48.295 mm — start **0** again — and the press ran at **9.86 mm/min
 | Test | Start sent / piston position | Ran at / set |
 |---|---|---|
 | step 19 | 0× (0 mm) | 9.86 / 10 mm/min |
+
+**Step 20 — force control** (`captures/20261019_163951_step20_force_5kN_s.jsonl`, template Ramp
+Control **Force, 5 kN/s, End 300 kN**, a 150 mm cube, stopped by the operator at 247 kN; the cube
+survived). Everything up to CONTINUE was the path test's sequence (`#B47` … `#B23`, `#B01` at the start
+load, `#D0520`), then `#D125000;0;300000;0;0`, `#B35`, `#B22`, `#O`. Force rose at **5.03 kN/s**
+(least squares over 47 s) while the piston moved at about 4.7 mm/min. So the ramp command is the same
+for both modes: the last field selects the channel, and the numbers are in thousandths of its unit.
+Not yet seen: what the controller does on reaching the end force by itself.
 
 Conclusion for now: the start field does not set the speed (steps 17, 18, 19), and 10 mm/min is
 within the press's reach (at low load). **Step 15's 2.06 mm/min remains unexplained.** The monitor measures every

@@ -85,25 +85,37 @@ class SetParam:
 class Ramp:
     """``#D12<speed>;<start>;<end>;<field4>;<channel>``: the main test's ramp.
 
-    Decoded from tests at different speeds (docs/PROTOCOL.md): ``speed`` in µm/s
-    and ``end`` in µm, both confirmed. ``start`` is in µm too, but what Proteus
-    puts there is not understood — 0, 1 and 2 times the piston position in three
-    tests — and neither is how the controller uses it: one ramp ran at a fifth of
-    its speed, another at its speed. So **no speed is predicted from it**; the
-    monitor measures the speed the press really runs at instead. ``field4`` is
-    unknown (``0`` every time); ``channel`` is believed to be the controlled
-    channel (``1``, Path, every time).
+    ``channel`` is the **controlled channel**, numbered as in the stream, and
+    ``speed``, ``start`` and ``end`` are in **thousandths of that channel's
+    unit**: µm/s and µm for Path (channel 1; steps 15–19, at 1, 3, 6 and
+    10 mm/min) and N/s and N for Force (channel 0; step 20, 5000 for 5 kN/s, which
+    ran at 5.03 kN/s, and 300000 for 300 kN) — docs/PROTOCOL.md. Only those two
+    channels are confirmed (:data:`DECODED_RAMP_CHANNELS`).
+
+    What Proteus puts in ``start`` is not understood — 0, 1 and 2 times the
+    piston position — and it does not set the speed, so **no speed is predicted
+    from it**; the monitor measures the rate the press really runs at instead.
+    ``field4`` is unknown (``0`` every time).
     """
 
-    speed_um_s: int
-    start_um: int
-    end_um: int
+    speed: int
+    start: int
+    end: int
     field4: int
     channel: int
 
     @property
-    def speed_mm_min(self) -> float:
-        return self.speed_um_s * 60.0 / 1000.0
+    def rate(self) -> float:
+        """The set rate in the channel's own unit per second (kN/s, mm/s)."""
+        return self.speed / 1000.0
+
+    @property
+    def start_value(self) -> float:
+        return self.start / 1000.0
+
+    @property
+    def end_value(self) -> float:
+        return self.end / 1000.0
 
 
 @dataclass(frozen=True)
@@ -115,11 +127,22 @@ class Unknown:
 
 Message = Sample | Reply | Ack | Command | SetParam | Ramp | Unknown
 
-#: The ramp channel whose units are decoded: every ramp seen so far was on
-#: channel 1 (Path) and its speed, start and end are in µm/s and µm. A ramp on
-#: any other channel — force control — is kept, but its numbers are not read as
-#: millimetres.
-PATH_CHANNEL = 1
+#: The ramp channels whose units are confirmed: 0 (Force, N and N/s) and 1 (Path,
+#: µm and µm/s). A ramp on any other channel is kept, but its numbers are not read
+#: in that channel's unit until a test confirms it.
+DECODED_RAMP_CHANNELS = frozenset({0, 1})
+
+
+def rate_text(per_s: float, unit: str) -> str:
+    """A rate as a test is set in it: a length per minute, anything else per second.
+
+    Displacement rates are set in mm/min and force rates in kN/s, in Proteus and
+    in the standards; showing one in the other's convention makes a correct
+    number look wrong.
+    """
+    if unit in ("mm", "µm", "um"):
+        return f"{per_s * 60:.3g} {unit}/min"
+    return f"{per_s:.3g} {unit}/s"
 
 _SAMPLE = re.compile(r"#D0(\d)(\d+)((?:;-?\d+;-?\d+)+)")
 _REPLY = re.compile(r"#D1(.*)")
@@ -200,8 +223,12 @@ def _with_doubt(m: Meaning) -> str:
     return m.label if m.confirmed else f"{m.label}?"
 
 
-def describe(direction: str, msg: Message) -> str:
-    """One line of plain words for the event log. A guess ends in ``?``."""
+def describe(direction: str, msg: Message, units: dict[int, str] | None = None) -> str:
+    """One line of plain words for the event log. A guess ends in ``?``.
+
+    ``units`` names each channel's unit (from the press file), so a ramp can be
+    told in it; without it a ramp is given in raw numbers.
+    """
     match msg:
         case Command(code):
             m = COMMANDS.get((direction, code))
@@ -216,11 +243,12 @@ def describe(direction: str, msg: Message) -> str:
                 return f"stream interval {value * 10} ms"
             return f"{_with_doubt(m)} = {value}" if m else f"parameter {param} = {value}"
         case Ramp():
-            if msg.channel != PATH_CHANNEL:
-                return (f"ramp on channel {msg.channel}: speed {msg.speed_um_s}, start "
-                        f"{msg.start_um}, end {msg.end_um} (units not decoded for this channel)")
-            return (f"ramp: {msg.speed_mm_min:.3g} mm/min from {msg.start_um / 1000:.3f} "
-                    f"to {msg.end_um / 1000:.3f} mm, channel {msg.channel}")
+            unit = (units or {}).get(msg.channel)
+            if msg.channel not in DECODED_RAMP_CHANNELS or unit is None:
+                return (f"ramp on channel {msg.channel}: speed {msg.speed}, start "
+                        f"{msg.start}, end {msg.end} (units not decoded for this channel)")
+            return (f"ramp on channel {msg.channel}: {rate_text(msg.rate, unit)} from "
+                    f"{msg.start_value:g} to {msg.end_value:g} {unit}")
         case Sample():
             return "measurement"
         case Unknown():

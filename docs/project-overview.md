@@ -41,9 +41,11 @@ and undocumented, so the protocol is learnt from the live link first.
 - The start-up commands not yet explained (`#B03`, `#B09`, `#B40/41`,
   `#B50–52`, `#D020`) — Proteus sends them identically every time, so they can
   be replayed as they are.
-- Why Proteus sent the ramp's start as 0 in one test
-  ([PROTOCOL.md](PROTOCOL.md#ramp-command-d12speedstartend0channel--decoded-2026-10-19)),
-  and whether it does so on every first test after start-up. The monitor warns
-  whenever it happens.
-- Force-controlled and deformation-controlled ramps: only path control has been
-  seen.
+- What Proteus puts in the ramp's start field (0, 1 and 2 times the piston
+  position); it does not set the speed (steps 17–19).
+- Why step 15's 10 mm/min path ramp on a cube ran at 2.06 mm/min, when a
+  10 mm/min ramp at low load ran correctly (step 19). The monitor measures every
+  ramp and warns when one is more than 20 % off.
+- Deformation-controlled ramps (channel 2), and what the controller does when a
+  ramp reaches its end on its own. Path and force control are decoded
+  ([steps 15–20](PROTOCOL.md)).

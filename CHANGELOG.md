@@ -11,8 +11,9 @@ What each version added or changed, newest first.
   start load, ramp, stopped, cancelled); the ramp Proteus sent, decoded; the
   peak force; a force–displacement plot of the newest test; and a log of
   every command and event heard, with its meaning.
-- The ramp's real speed, measured from the path while it runs, beside the speed
-  that was set, and a warning when the two differ by more than 20 %. The start
+- The ramp's real rate, measured while it runs, beside the rate that was set —
+  mm/min for path control, kN/s for force control — and a warning when the two
+  differ by more than 20 %. The start
   position the ramp was sent with is shown beside the piston's, as a note.
 - Every byte heard is kept as a capture, and every test as a CSV with raw counts
   beside the values.
