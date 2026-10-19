@@ -38,8 +38,7 @@ def test_mid_test_the_window_shows_the_ramp_and_its_warning(qapp, press):
         assert "2.06 mm/min" in win.ramp_lbl.text()
         assert "2.06 mm/min" in win.message.text()
         assert win.gauges[0].reading.text().endswith(" kN")
-        assert not win.time_view.pixmap().isNull()
-        assert not win.xy_view.pixmap().isNull()
+        assert not win.plot_view.pixmap().isNull()
         assert "#B22" in win.log_view.toPlainText()
     finally:
         win.close()
@@ -83,3 +82,13 @@ def test_before_any_test_the_plots_wait(qapp, press, until):
         assert win.peak_gauge.reading.text() in ("–", "")
     finally:
         win.close()
+
+
+def test_the_plot_is_force_against_displacement():
+    """Rendered Qt-free; an empty test says what it is waiting for."""
+    from presscontroller.app.plot import render_force_displacement
+    img = render_force_displacement([0.0, 0.5, None, 1.0], [0.0, 400.0, 900.0, 1200.0],
+                                    peak=(1.0, 1200.0), size_px=(400, 300), dpi=100)
+    assert img.shape == (300, 400, 3)
+    blank = render_force_displacement([], [], size_px=(400, 300), dpi=100)
+    assert blank.shape == (300, 400, 3)

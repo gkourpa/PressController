@@ -6,8 +6,8 @@ controller — without Proteus.
 The controller's protocol has been learnt by listening to Proteus through a
 passive RS-232 tap ([notes](docs/PROTOCOL.md), [wiring](docs/RS232_Tap_Wiring.pdf)).
 The first program built on it is a **listen-only monitor**: it shows the live
-force, path and deformation, the test's phase and ramp, the peak, force–time and
-force–path plots and every command heard, and saves each test as a CSV — while
+force, path and deformation, the test's phase and ramp, the peak, a
+force–displacement plot and every command heard, and saves each test as a CSV — while
 Proteus still runs the press.
 
 ```powershell

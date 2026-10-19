@@ -20,10 +20,14 @@ mistaken for the press.
   newest test. Copied from DAqReader, with its rules: right-aligned, sized for the
   widest reading the channel's range can give, shrinking only, never a zero for
   a missing value (a dash instead).
-- **Plots** of the newest test: force against time since START, with the peak
-  marked and written out; and force against **path since the start load was
-  reached** — the approach before it is tens of millimetres at no load and
-  would flatten the loading curve into a vertical line.
+- **Plot**: force against displacement of the newest test, with the newest
+  point dotted and the peak marked and written out. **Not against time**
+  (operator, 2026-10-19): the curve is what a compression test is read by, and
+  time only adds the approach and the hold. Displacement is the position channel
+  (*Path*) counted **from where the start load was reached** — the approach
+  before it is tens of millimetres at no load and would flatten the loading
+  curve into a vertical line. During the approach the plot shows position as it
+  stands, so it is not blank while the piston moves.
 - **Log**: every non-measurement line heard, both directions, with its meaning;
   a guess ends in `?`, and a line not in the protocol notes is marked `!!`.
 - **Message island**: what needs saying now — a ramp whose start is not where

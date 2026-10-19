@@ -1,20 +1,20 @@
-"""The two live plots of a test, rendered to an ndarray — Qt-free and testable.
+"""The live plot of a test — force against displacement — rendered to an ndarray.
 
-DAqReader's ``daqreader/app/plot.py`` way of drawing, for its reasons: render to
-an Agg buffer and show it as a pixmap, with the **pyplot-free** ``Figure`` +
-``FigureCanvasAgg`` API, because pyplot selects a GUI backend at import and a
-QtAgg canvas deadlocks under the offscreen platform the tests use.
-:class:`StickyMargins` and the helpers below are copied from there as they stood
-on 2026-10-19; the two renderers are this application's own.
+Qt-free and testable. DAqReader's ``daqreader/app/plot.py`` way of drawing, for
+its reasons: render to an Agg buffer and show it as a pixmap, with the
+**pyplot-free** ``Figure`` + ``FigureCanvasAgg`` API, because pyplot selects a GUI
+backend at import and a QtAgg canvas deadlocks under the offscreen platform the
+tests use. :class:`StickyMargins` and the helpers below are copied from there as
+they stood on 2026-10-19; the renderer is this application's own.
 
 Kept from there: plain lines, a gap left as a break (``None`` becomes NaN and
 is never bridged), no axis offset (``1515.88`` must not read as ``0.88`` with
 ``+1.515e3`` in a corner), and a dot on the newest point of a parametric curve.
 
-**Time is in seconds here**, where DAqReader draws minutes. A compression test is
-a few minutes long and is read in seconds — the approach, the hold at start load,
-the seconds to failure — and the axis never changes unit, which was the fault
-DAqReader's rule fixed.
+**Force against displacement, not against time** (operator, 2026-10-19): the
+curve is what a compression test is read by — its stiffness, the peak and what
+the specimen did after it — and time adds only the approach and the hold at the
+start load, which say nothing about the specimen.
 """
 
 from __future__ import annotations
@@ -111,47 +111,26 @@ def _array(values: Sequence[float | None]) -> np.ndarray:
     return np.array([np.nan if v is None else v for v in values], dtype=float)
 
 
-def render_force_time(t: Sequence[float], force: Sequence[float | None], *,
-                      peak: tuple[float, float] | None = None, force_label: str = "Force (kN)",
-                      title: str = "", size_px: tuple[int, int] = (720, 480), dpi: int = 100,
-                      margins: StickyMargins | None = None) -> np.ndarray:
-    """Force against the test's own time, with its peak marked and labelled.
+def render_force_displacement(displacement: Sequence[float | None],
+                               force: Sequence[float | None], *,
+                               peak: tuple[float, float] | None = None,
+                               displacement_label: str = "Displacement (mm)",
+                               force_label: str = "Force (kN)",
+                               units: tuple[str, str] = ("mm", "kN"), title: str = "",
+                               size_px: tuple[int, int] = (720, 480), dpi: int = 100,
+                               margins: StickyMargins | None = None) -> np.ndarray:
+    """Force against displacement, the newest point dotted, the peak marked.
 
-    ``peak`` is ``(time, force)``. It is drawn as a marker and written out in
-    the corner, because the peak is the number a compression test is for and the
-    highest pixel of a curve is a poor way to read it.
-    """
-    fig = _figure(size_px, dpi)
-    if not len(t):
-        return _empty(fig, title or "no test yet: waiting for START")
-    ax = fig.add_subplot(111)
-    ax.plot(np.asarray(t, float), _array(force), lw=1)
-    if peak is not None:
-        ax.plot([peak[0]], [peak[1]], marker="v", ms=PEAK_MARKER_MS, linestyle="none",
-                color="C3")
-        ax.text(0.01, 0.98, f"peak {peak[1]:.2f} at {peak[0]:.1f} s", transform=ax.transAxes,
-                ha="left", va="top", fontsize=8)
-    ax.set_xlabel("time since START (s)", fontsize=8)
-    ax.set_ylabel(force_label, fontsize=8)
-    if title:
-        ax.set_title(title, fontsize=9)
-    ax.grid(True, alpha=0.3)
-    _no_offset(ax)
-    _lay_out(fig, margins)
-    return _to_bgr(fig)
-
-
-def render_force_path(path: Sequence[float | None], force: Sequence[float | None], *,
-                      path_label: str = "Path (mm)", force_label: str = "Force (kN)",
-                      title: str = "", size_px: tuple[int, int] = (720, 480), dpi: int = 100,
-                      margins: StickyMargins | None = None) -> np.ndarray:
-    """Force against position, with a dot on the newest point.
+    ``peak`` is ``(displacement, force)``; ``units`` are the two axes' units, in
+    that order, for the peak's note. It is drawn as a marker and written out
+    in the corner, because the peak is the number a compression test is for and
+    the highest pixel of a curve is a poor way to read it.
 
     Only the points where **both** channels have a value are drawn, so a gap in
     one leaves a break rather than a point invented from the other.
     """
     fig = _figure(size_px, dpi)
-    x, y = _array(path), _array(force)
+    x, y = _array(displacement), _array(force)
     good = np.flatnonzero(np.isfinite(x) & np.isfinite(y))
     if not good.size:
         return _empty(fig, title or "no test yet: waiting for START")
@@ -159,7 +138,12 @@ def render_force_path(path: Sequence[float | None], force: Sequence[float | None
     ax.plot(x, y, lw=1)
     i = good[-1]
     ax.plot([x[i]], [y[i]], marker="o", ms=LATEST_MARKER_MS, linestyle="none", color="C0")
-    ax.set_xlabel(path_label, fontsize=8)
+    if peak is not None:
+        ax.plot([peak[0]], [peak[1]], marker="v", ms=PEAK_MARKER_MS, linestyle="none",
+                color="C3")
+        ax.text(0.01, 0.98, f"peak {peak[1]:.2f} {units[1]} at {peak[0]:.3f} {units[0]}", transform=ax.transAxes,
+                ha="left", va="top", fontsize=8)
+    ax.set_xlabel(displacement_label, fontsize=8)
     ax.set_ylabel(force_label, fontsize=8)
     if title:
         ax.set_title(title, fontsize=9)

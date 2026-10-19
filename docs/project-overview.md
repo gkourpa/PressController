@@ -26,8 +26,8 @@ and undocumented, so the protocol is learnt from the live link first.
    scaling, start-up and shut-down, START/approach, start load, the ramp and its
    encoding, Stop, Cancel, Peak, break detection, the keypad STOP.
 2. **Listen-only monitor.** Written and tested on real captures (version 0.0.1):
-   live readings, test phase, ramp decoding, peak, force–time and force–path
-   plots, the log, a capture and a CSV per test, and a warning when Proteus sends
+   live readings, test phase, ramp decoding, peak, a force–displacement plot,
+   the log, a capture and a CSV per test, and a warning when Proteus sends
    a ramp whose start is not where the piston is. Not yet run on the live tap.
 3. **Run a test without Proteus.** Send the confirmed commands, in a supervised
    session, with the controller's STOP and the emergency stop at hand.

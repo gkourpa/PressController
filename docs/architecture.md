@@ -48,8 +48,8 @@ From DAqReader (`..\DAqReader`), as it stood on 2026-10-19:
   `get_str_list`), unchanged.
 - `app/theme.py`, with its widget attribute renamed.
 - `app/widgets.py`, without DAqReader's `PlotPanel`.
-- `app/plot.py`'s `StickyMargins` and drawing helpers; the two renderers are
-  this application's own.
+- `app/plot.py`'s `StickyMargins` and drawing helpers; the renderer is this
+  application's own.
 
 These are copies, not a shared package: a fix in one is not automatically a fix
 in the other.

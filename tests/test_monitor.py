@@ -131,3 +131,30 @@ def test_a_channel_missing_from_a_line_is_a_gap_not_a_number(press):
     test = m.current
     assert test.raw[2] == [None, 300]
     assert m.series(test, 2) == [None, pytest.approx(300 * 5 / 600000)]
+
+
+def test_force_displacement_counts_from_the_start_load(press):
+    m, _ = replay_all(press, REAL_TEST)
+    test = m.tests[0]
+    fd = m.force_displacement(test)
+    assert fd.displacement[0] == 0.0
+    assert fd.origin == pytest.approx(79.2, abs=0.05)          # where 4.39 kN was reached
+    # The cube failed after about 2.3 mm of travel from the start load.
+    assert fd.peak == (pytest.approx(81.4935 - fd.origin), pytest.approx(1515.88, abs=0.01))
+    assert len(fd.displacement) == len(fd.force)
+
+
+def test_during_the_approach_displacement_is_position(press):
+    m = Monitor(press)
+    for ev in read_capture(REAL_TEST):
+        if ev.t > 200:
+            break
+        m.feed(ev)
+    fd = m.force_displacement(m.current)
+    assert fd.origin is None and fd.peak is None
+    assert fd.displacement == m.series(m.current, m.path_index)
+
+
+def test_no_test_no_curve(press):
+    fd = Monitor(press).force_displacement(None)
+    assert fd.displacement == [] and fd.force == [] and fd.peak is None

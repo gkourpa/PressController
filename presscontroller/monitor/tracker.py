@@ -124,6 +124,17 @@ class TestRecord:
             col.append(raw.get(idx))            # and one missing from a line is a gap
 
 
+@dataclass(frozen=True)
+class ForceDisplacement:
+    displacement: list[float | None]
+    force: list[float | None]
+    peak: tuple[float, float] | None
+    """``(displacement, force)`` at the test's highest force."""
+    origin: float | None
+    """The position displacement is counted from: where the start load was
+    reached. ``None`` while the approach is still under way."""
+
+
 class Monitor:
     """Everything the window shows, made from the lines fed to :meth:`feed`."""
 
@@ -200,6 +211,31 @@ class Monitor:
             return None
         loading = {Phase.AT_START_LOAD.value, Phase.RAMP.value, Phase.HELD.value}
         return next((i for i, ph in enumerate(test.phase) if ph in loading), None)
+
+    def force_displacement(self, test: TestRecord | None) -> ForceDisplacement:
+        """``test``'s force against displacement, as the monitor plots it.
+
+        Displacement is the position channel (*Path*) counted from where it was
+        when the start load was reached (:meth:`loading_start`): the approach
+        before it is tens of millimetres at no load, which would flatten the
+        loading curve into a vertical line. Until the start load is reached the
+        approach is given against position as it stands, so the plot is never
+        blank while the piston moves; ``origin`` is then ``None``.
+        """
+        if test is None:
+            return ForceDisplacement([], [], None, None)
+        forces = self.series(test, self.force_index)
+        paths = self.series(test, self.path_index)
+        i0 = self.loading_start(test)
+        if i0 is None or not paths or paths[i0] is None:
+            return ForceDisplacement(paths, forces, None, None)
+        origin = paths[i0]
+        xs = [None if p is None else p - origin for p in paths[i0:]]
+        peak = self.peak(test)
+        at = None
+        if peak is not None and peak[2] is not None:
+            at = (peak[2] - origin, peak[0])
+        return ForceDisplacement(xs, forces[i0:], at, origin)
 
     def rate(self, index: int | None) -> float | None:
         """Units per second over the last :data:`RATE_WINDOW_S`, or ``None``."""
