@@ -219,19 +219,19 @@ ramp that ran slow** (2.06 / 10 mm/min, from its first second and at 11 kN, so n
 load). Open: whether the press can run a 10 mm/min path ramp at all — repeat at 10 mm/min.
 Step 18 also had three Stop presses (`#B18` ×3) before Cancel.
 
-**Step 19** (`captures/20261019_161427_step19_live_10mm_min_no_contact.jsonl`, template 10 mm/min,
-no specimen contact): ramp `#D12167;0;100000;0;1` sent with the piston at 48.295 mm — start **0**
-again — and the press ran at **9.86 mm/min** (least squares over 51 s; 8–12 mm/min second by second
-at no load). So the press **can** run a 10 mm/min path ramp, and a start of 0 does not slow it.
-Also: **CONTINUE was pressed during the approach**, before any `#B01` — Proteus does not wait for the
-start load, and the controller accepted the ramp (`#B35`, `#O`) and ran it.
+**Step 19** (`captures/20261019_161427_step19_live_10mm_min.jsonl`, template 10 mm/min, a soft or
+yielding specimen): force rose from ~0 to 3.8 kN at 45.25 mm and the controller reported the start load
+(`#B01`, 0.1 % of 4000 kN = 4 kN). After CONTINUE the ramp `#D12167;0;100000;0;1` was sent with the
+piston at 48.295 mm — start **0** again — and the press ran at **9.86 mm/min** (least squares over 51 s;
+8–12 mm/min second by second) while the force stayed at 7–9 kN over 8.5 mm of travel. So the press
+**can** run a 10 mm/min path ramp, and a start of 0 does not slow it.
 
 | Test | Start sent / piston position | Ran at / set |
 |---|---|---|
 | step 19 | 0× (0 mm) | 9.86 / 10 mm/min |
 
 Conclusion for now: the start field does not set the speed (steps 17, 18, 19), and 10 mm/min is
-within the press's reach. **Step 15's 2.06 mm/min remains unexplained.** The monitor measures every
+within the press's reach (at low load). **Step 15's 2.06 mm/min remains unexplained.** The monitor measures every
 ramp's speed and warns after 10 s if it is more than 20 % off, so a recurrence will be caught and
 recorded.
 
@@ -307,7 +307,7 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 - Meaning of display indicators ZB, (bottom) FO, LD.
 - What each start-up command means (`#B20/21`, `#B40/41`, `#B50/51/52`, `#B03`, `#B09`, `#D020`, `#D0510`).
 - What Proteus puts in the ramp's start field (0×, 1×, 2×, 0×, 0× the piston position in steps 15–19); it does not affect the speed (steps 17–19).
-- Why step 15's 10 mm/min ramp ran at 2.06 mm/min; step 19 ran 10 mm/min correctly (no contact).
+- Why step 15's 10 mm/min ramp ran at 2.06 mm/min; step 19 ran 10 mm/min correctly (at 7–9 kN).
 - Ramp field 4 (`0`) and whether field 5 changes with Force/Deformation control.
 - Whether break detection (`#B33`) is ever enabled by a template, and what the controller sends on break.
 - Whether other keypad keys (START, ZERO, PEAK…) are forwarded like STOP (`#B28`) in PC mode.
