@@ -198,7 +198,23 @@ must handle it (at minimum: stop/cancel the test). After `#B21` the keypad works
 | `0` | ? | unknown |
 | `1` | control channel (1 = Path)? | hypothesis |
 
-**Why step 15 ran at 2.06 mm/min:** Proteus sent start = **0**. The controller seems to plan the ramp
+**Step 17** (first live run of the monitor, `captures/20261019_155241_step17_live_monitor_3mm_min.jsonl`,
+template 3 mm/min): `#D1250;159202;100000;0;1` — speed 50 µm/s = 3 mm/min, but start **159.202 mm =
+exactly 2 × the piston position (79.6005 mm)**, past the end. The press ran at the set **3.0 mm/min**
+(measured 2.7–3.1 mm/min over the ramp). Start-up of this Proteus session was in the previous capture;
+this was its first test.
+
+| Test | Start sent / piston position | Ran at / set |
+|---|---|---|
+| step 15 | 0× (0 mm) | 2.06 / 10 mm/min |
+| step 16 | 1× | 6 / 6 mm/min |
+| step 17 | 2× | 3.0 / 3 mm/min |
+
+So the start field is **not** simply where Proteus believes the piston is, and the "duration = (end − start)
+/ speed" model below fits step 15 but **not** step 17 (it would predict ~1 mm/min). Hypothesis to test:
+Proteus' own Zero/Reset (software tare) enters the start value. **Unresolved.**
+
+**Why step 15 ran at 2.06 mm/min (one model, contradicted by step 17):** Proteus sent start = **0**. The controller seems to plan the ramp
 duration as (end − start) / speed = (100 − 0) mm / 10 mm/min = 10 min and then covers the *actual*
 remaining distance in that time: (100 − 79.45) mm / 10 min = **2.055 mm/min** — matches the measured
 2.06 mm/min. In step 16 start = actual position, so the ramp ran at the set speed.
@@ -264,7 +280,7 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 - Which start-up command makes **PC** / **FO** appear on the controller display.
 - Meaning of display indicators ZB, (bottom) FO, LD.
 - What each start-up command means (`#B20/21`, `#B40/41`, `#B50/51/52`, `#B03`, `#B09`, `#D020`, `#D0510`).
-- Why Proteus sent ramp start = 0 in step 15 (first test after start-up?).
+- What Proteus puts in the ramp's start field (0×, 1×, 2× the piston position in steps 15–17), and how the controller uses it (step 15 slowed, step 17 did not).
 - Ramp field 4 (`0`) and whether field 5 changes with Force/Deformation control.
 - Whether break detection (`#B33`) is ever enabled by a template, and what the controller sends on break.
 - Whether other keypad keys (START, ZERO, PEAK…) are forwarded like STOP (`#B28`) in PC mode.
