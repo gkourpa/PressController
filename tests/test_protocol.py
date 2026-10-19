@@ -94,6 +94,11 @@ def test_ramp_units():
     assert Ramp(100, 79446, 100000, 0, 1).speed_mm_min == pytest.approx(6.0)
 
 
+def test_a_ramp_off_the_path_channel_is_not_read_as_millimetres():
+    text = describe(PC_TO_CTRL, Ramp(5000, 0, 300000, 0, 0))
+    assert "channel 0" in text and "units not decoded" in text and "mm/min" not in text
+
+
 def test_descriptions_mark_a_guess_with_a_question_mark():
     assert describe(PC_TO_CTRL, Command(17)) == "Cancel: pump off, test ends"
     assert describe(PC_TO_CTRL, Command(20)).endswith("?")

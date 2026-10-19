@@ -7,6 +7,7 @@ the protocol was learned by listening and some of it is still a guess.
 
 from presscontroller.protocol.lines import CTRL_TO_PC, DIRECTIONS, PC_TO_CTRL, LineAssembler
 from presscontroller.protocol.messages import (
+    PATH_CHANNEL,
     Ack,
     Command,
     Message,
@@ -20,7 +21,7 @@ from presscontroller.protocol.messages import (
 )
 
 __all__ = [
-    "Ack", "CTRL_TO_PC", "Command", "DIRECTIONS", "LineAssembler", "Message",
+    "Ack", "CTRL_TO_PC", "PATH_CHANNEL", "Command", "DIRECTIONS", "LineAssembler", "Message",
     "PC_TO_CTRL", "Ramp", "Reply", "Sample", "SetParam", "Unknown", "describe",
     "parse",
 ]

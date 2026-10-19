@@ -250,14 +250,26 @@ class MainWindow(QMainWindow):
                 self.ramp_lbl.setText("not sent yet")
             else:
                 r = test.ramp
-                measured = test.ramp_mm_min
-                text = f"set {r.speed_mm_min:.3g} mm/min"
-                text += (f" · measured {measured:.2f} mm/min ({test.ramp_seconds:.0f} s)"
-                         if measured is not None and test.ramp_seconds >= 2 else
-                         " · measuring…")
-                text += f"\nto {r.end_um / 1000:.3f} mm; start sent {r.start_um / 1000:.3f} mm"
-                if test.ramp_from_mm is not None:
-                    text += f", piston was at {test.ramp_from_mm:.3f} mm"
+                settled = test.ramp_seconds >= 2
+                if test.path_ramp:
+                    measured = test.ramp_mm_min
+                    text = f"set {r.speed_mm_min:.3g} mm/min"
+                    text += (f" · measured {measured:.2f} mm/min ({test.ramp_seconds:.0f} s)"
+                             if measured is not None and settled else " · measuring…")
+                    text += (f"\nto {r.end_um / 1000:.3f} mm; start sent "
+                             f"{r.start_um / 1000:.3f} mm")
+                    if test.ramp_from_mm is not None:
+                        text += f", piston was at {test.ramp_from_mm:.3f} mm"
+                else:
+                    ch = press.channel(r.channel)
+                    name = ch.name if ch else f"channel {r.channel}"
+                    kn_s, mm_min = test.ramp_kn_s, test.ramp_mm_min
+                    text = f"{name} control (not decoded yet): speed field {r.speed_um_s}"
+                    text += (f"\nmeasured {kn_s:.2f} kN/s, path {mm_min:.2f} mm/min "
+                             f"({test.ramp_seconds:.0f} s)"
+                             if kn_s is not None and mm_min is not None and settled
+                             else "\nmeasuring…")
+                    text += f"\nstart field {r.start_um}, end field {r.end_um}"
                 if test.warnings:
                     text += "\nWarning: " + test.warnings[-1]
                 self.ramp_lbl.setText(text)

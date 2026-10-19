@@ -34,6 +34,7 @@ from enum import Enum
 from presscontroller.config.press import FORCE, PATH, PressConfig
 from presscontroller.protocol import (
     CTRL_TO_PC,
+    PATH_CHANNEL,
     PC_TO_CTRL,
     Command,
     Ramp,
@@ -119,6 +120,8 @@ class TestRecord:
     _fit: list[float] = field(default_factory=lambda: [0.0] * 5)
     """Running sums n, St, Sx, Stt, Stx of position against time over the ramp,
     so its speed is a least-squares fit at any moment without a pass over it."""
+    _fit_force: list[float] = field(default_factory=lambda: [0.0] * 5)
+    """The same sums for force against time: the measured rate of a force ramp."""
     _ramp_t: list[float] = field(default_factory=lambda: [0.0, 0.0])
     """Test time of the ramp's first and newest sample."""
     closed: bool = False
@@ -135,17 +138,19 @@ class TestRecord:
         for idx, col in self.raw.items():
             col.append(raw.get(idx))            # and one missing from a line is a gap
 
-    def fit_ramp(self, t: float, position_mm: float) -> None:
-        """Add one ramp sample to the speed fit."""
-        s = self._fit
-        if s[0] == 0:
+    def fit_ramp(self, t: float, position_mm: float | None, force_kn: float | None) -> None:
+        """Add one ramp sample to the speed fits."""
+        if self._fit[0] == 0 and self._fit_force[0] == 0:
             self._ramp_t[0] = t
         self._ramp_t[1] = t
-        s[0] += 1
-        s[1] += t
-        s[2] += position_mm
-        s[3] += t * t
-        s[4] += t * position_mm
+        for s, x in ((self._fit, position_mm), (self._fit_force, force_kn)):
+            if x is None:
+                continue
+            s[0] += 1
+            s[1] += t
+            s[2] += x
+            s[3] += t * t
+            s[4] += t * x
 
     @property
     def ramp_seconds(self) -> float:
@@ -157,11 +162,29 @@ class TestRecord:
         """The speed the ramp has really run at so far: the slope of position
         against time, least squares over every ramp sample, in mm/min. ``None``
         before there are two samples to fit."""
-        n, st, sx, stt, stx = self._fit
-        den = n * stt - st * st
-        if n < 2 or den <= 0:
-            return None
-        return (n * stx - st * sx) / den * 60.0
+        slope = _slope(self._fit)
+        return None if slope is None else slope * 60.0
+
+    @property
+    def ramp_kn_s(self) -> float | None:
+        """The rate force has really risen at over the ramp so far, in kN/s —
+        what a force-controlled ramp is judged by, once its units are known."""
+        return _slope(self._fit_force)
+
+    @property
+    def path_ramp(self) -> bool:
+        """Whether the ramp is on the path channel, the only one whose speed is
+        decoded (mm/min) and so the only one judged."""
+        return self.ramp is not None and self.ramp.channel == PATH_CHANNEL
+
+
+def _slope(sums: list[float]) -> float | None:
+    """Least-squares slope from running sums n, St, Sx, Stt, Stx."""
+    n, st, sx, stt, stx = sums
+    den = n * stt - st * st
+    if n < 2 or den <= 0:
+        return None
+    return (n * stx - st * sx) / den
 
 
 @dataclass(frozen=True)
@@ -330,16 +353,27 @@ class Monitor:
         test = self.current
         if test is not None:
             test.add_sample(ev.t - test.t0, s.counter, self.phase, s.raw)
-            if self.phase is Phase.RAMP and self.path_index in s.raw:
+            if self.phase is Phase.RAMP:
                 test.fit_ramp(ev.t - test.t0,
-                              self.value(self.path_index, s.raw[self.path_index]))
+                              self._raw_value(self.path_index, s.raw),
+                              self._raw_value(self.force_index, s.raw))
                 return self._judge_ramp(test)
         return []
 
+    def _raw_value(self, index: int | None, raw: dict[int, int]) -> float | None:
+        return None if index is None or index not in raw else self.value(index, raw[index])
+
     def _judge_ramp(self, test: TestRecord) -> list[Notice]:
         """Once, after :data:`RAMP_JUDGE_AFTER_S` of ramp: say so if the press is
-        not loading at the speed that was set."""
-        if test.ramp_judged or test.ramp is None or test.ramp_seconds < RAMP_JUDGE_AFTER_S:
+        not loading at the speed that was set.
+
+        Only a path ramp is judged. A ramp on another channel — force control —
+        has a speed field whose unit has not been decoded yet, and comparing it
+        with millimetres per minute would be a false alarm; its measured rate is
+        shown instead, which is also how its unit will be worked out.
+        """
+        if (test.ramp_judged or not test.path_ramp
+                or test.ramp_seconds < RAMP_JUDGE_AFTER_S):
             return []
         test.ramp_judged = True
         measured, wanted = test.ramp_mm_min, test.ramp.speed_mm_min

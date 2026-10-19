@@ -115,6 +115,12 @@ class Unknown:
 
 Message = Sample | Reply | Ack | Command | SetParam | Ramp | Unknown
 
+#: The ramp channel whose units are decoded: every ramp seen so far was on
+#: channel 1 (Path) and its speed, start and end are in µm/s and µm. A ramp on
+#: any other channel — force control — is kept, but its numbers are not read as
+#: millimetres.
+PATH_CHANNEL = 1
+
 _SAMPLE = re.compile(r"#D0(\d)(\d+)((?:;-?\d+;-?\d+)+)")
 _REPLY = re.compile(r"#D1(.*)")
 _COMMAND = re.compile(r"#B(\d\d)")
@@ -210,6 +216,9 @@ def describe(direction: str, msg: Message) -> str:
                 return f"stream interval {value * 10} ms"
             return f"{_with_doubt(m)} = {value}" if m else f"parameter {param} = {value}"
         case Ramp():
+            if msg.channel != PATH_CHANNEL:
+                return (f"ramp on channel {msg.channel}: speed {msg.speed_um_s}, start "
+                        f"{msg.start_um}, end {msg.end_um} (units not decoded for this channel)")
             return (f"ramp: {msg.speed_mm_min:.3g} mm/min from {msg.start_um / 1000:.3f} "
                     f"to {msg.end_um / 1000:.3f} mm, channel {msg.channel}")
         case Sample():

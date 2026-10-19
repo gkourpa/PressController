@@ -184,3 +184,35 @@ def test_during_the_approach_displacement_is_position(press):
 def test_no_test_no_curve(press):
     fd = Monitor(press).force_displacement(None)
     assert fd.displacement == [] and fd.force == [] and fd.peak is None
+
+
+def _force_ramp(press, rate_kn_s=5.0, seconds=15.0):
+    """A force ramp as it might be heard: channel 0, force rising, path creeping."""
+    m = Monitor(press)
+    w = datetime(2026, 1, 1)
+    feed = lambda t, d, text: m.feed(TapEvent(t, w, d, text))
+    notices = []
+    for t, d, text in [(0.0, PC_TO_CTRL, "#B47"), (0.1, PC_TO_CTRL, "#B23"),
+                       (1.0, CTRL_TO_PC, "#B01"), (2.0, PC_TO_CTRL, "#D125000;0;300000;0;0"),
+                       (2.1, PC_TO_CTRL, "#B22")]:
+        notices += feed(t, d, text)
+    k = 0
+    while k * 0.2 < seconds:
+        t = 2.2 + k * 0.2
+        force_raw = round((10 + rate_kn_s * k * 0.2) * 600000 / 4000)
+        path_raw = round((80 + 0.01 * k * 0.2) * 600000 / 100)
+        notices += feed(t, CTRL_TO_PC, f"#D08{k * 20};0;{force_raw};1;{path_raw};2;-25600")
+        k += 1
+    return m, notices
+
+
+def test_a_force_ramp_is_measured_in_kn_per_s_and_not_judged_in_mm(press):
+    m, notices = _force_ramp(press, rate_kn_s=5.0)
+    test = m.tests[0]
+    assert test.ramp.channel == 0 and not test.path_ramp
+    assert test.ramp_kn_s == pytest.approx(5.0, abs=0.01)
+    assert test.ramp_mm_min == pytest.approx(0.6, abs=0.01)
+    # 5000 is no millimetre speed; comparing it with mm/min would be a false alarm.
+    assert test.warnings == [] and not any(n.warn for n in notices)
+    assert "units not decoded" in m.log[-1].meaning or any(
+        "units not decoded" in e.meaning for e in m.log)

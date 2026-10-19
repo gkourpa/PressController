@@ -54,6 +54,11 @@ ramp's start field, a model that fitted one test and was contradicted by the
 next ([protocol notes](PROTOCOL.md)); a measurement is right whatever the
 explanation turns out to be.
 
+Only a **path** ramp (channel 1, the only one decoded) is judged. A ramp on
+another channel — force control — shows its raw speed field beside the measured
+force rate (kN/s) and path rate, and raises no speed warning: its unit is not
+known yet, and those measured rates are how it will be worked out.
+
 The **start position** the ramp was sent with is shown beside where the piston
 really was, as a **plain note, not a warning** (operator, 2026-10-19). Proteus
 sends odd starts — 0, 1 and 2 times the piston position — and ramps with a wrong
