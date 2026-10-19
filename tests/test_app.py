@@ -35,8 +35,9 @@ def test_mid_test_the_window_shows_the_ramp_and_its_warning(qapp, press):
         assert win.phase_lbl.text() == "ramp"
         assert win.link_lbl.text().startswith("connected (PC mode), data every 200 ms")
         assert win.peak_gauge.reading.text() == "1515.88 kN"
-        assert "2.06 mm/min" in win.ramp_lbl.text()
-        assert "2.06 mm/min" in win.message.text()
+        assert "set 10 mm/min · measured 2.0" in win.ramp_lbl.text()
+        assert "piston was at 79.451 mm" in win.ramp_lbl.text()
+        assert "not the 10 mm/min set" in win.message.text()
         assert win.gauges[0].reading.text().endswith(" kN")
         assert not win.plot_view.pixmap().isNull()
         assert "#B22" in win.log_view.toPlainText()

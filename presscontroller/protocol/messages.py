@@ -85,10 +85,14 @@ class SetParam:
 class Ramp:
     """``#D12<speed>;<start>;<end>;<field4>;<channel>``: the main test's ramp.
 
-    Decoded from two tests at different speeds (docs/PROTOCOL.md): ``speed`` in
-    µm/s, ``start`` and ``end`` positions in µm. ``field4`` is unknown (``0``
-    both times); ``channel`` is believed to be the controlled channel (``1``,
-    Path, both times).
+    Decoded from tests at different speeds (docs/PROTOCOL.md): ``speed`` in µm/s
+    and ``end`` in µm, both confirmed. ``start`` is in µm too, but what Proteus
+    puts there is not understood — 0, 1 and 2 times the piston position in three
+    tests — and neither is how the controller uses it: one ramp ran at a fifth of
+    its speed, another at its speed. So **no speed is predicted from it**; the
+    monitor measures the speed the press really runs at instead. ``field4`` is
+    unknown (``0`` every time); ``channel`` is believed to be the controlled
+    channel (``1``, Path, every time).
     """
 
     speed_um_s: int
@@ -100,20 +104,6 @@ class Ramp:
     @property
     def speed_mm_min(self) -> float:
         return self.speed_um_s * 60.0 / 1000.0
-
-    def effective_mm_min(self, position_mm: float) -> float | None:
-        """The rate the controller will actually run at from ``position_mm``.
-
-        The controller plans the ramp's duration as (end − start) / speed and
-        covers the distance actually left in that time, which is how a ramp sent
-        with start ``0`` from 79.45 mm ran at 2.06 mm/min instead of 10. ``None``
-        where the ramp has no length.
-        """
-        planned = self.end_um - self.start_um
-        if planned <= 0:
-            return None
-        remaining = self.end_um - position_mm * 1000.0
-        return self.speed_mm_min * remaining / planned
 
 
 @dataclass(frozen=True)

@@ -11,10 +11,11 @@ What each version added or changed, newest first.
   start load, ramp, stopped, cancelled); the ramp Proteus sent, decoded; the
   peak force; a force–displacement plot of the newest test; and a log of
   every command and event heard, with its meaning.
-- A warning when Proteus sends a ramp whose start is not where the piston is,
-  with the speed the controller will really load at.
+- The ramp's real speed, measured from the path while it runs, beside the speed
+  that was set; a warning when the two differ by more than 20 %, and when
+  Proteus sends a ramp whose start is not where the piston is.
 - Every byte heard is kept as a capture, and every test as a CSV with raw counts
   beside the values.
 - `--replay` plays a recorded capture instead of listening.
 
-Not yet run on the live tap; tested on three real recordings.
+First run on the live tap on 2026-10-19; tested on four real recordings.

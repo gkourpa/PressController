@@ -211,8 +211,9 @@ this was its first test.
 | step 17 | 2× | 3.0 / 3 mm/min |
 
 So the start field is **not** simply where Proteus believes the piston is, and the "duration = (end − start)
-/ speed" model below fits step 15 but **not** step 17 (it would predict ~1 mm/min). Hypothesis to test:
-Proteus' own Zero/Reset (software tare) enters the start value. **Unresolved.**
+/ speed" model below fits step 15 but **not** step 17 (it would predict ~1 mm/min). Proteus' own Zero/Reset (software tare) was ruled out: neither was pressed
+before steps 15 or 17 (operator). **Unresolved.** The monitor therefore measures
+the ramp's speed rather than predicting it.
 
 **Why step 15 ran at 2.06 mm/min (one model, contradicted by step 17):** Proteus sent start = **0**. The controller seems to plan the ramp
 duration as (end − start) / speed = (100 − 0) mm / 10 mm/min = 10 min and then covers the *actual*

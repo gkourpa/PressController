@@ -41,8 +41,18 @@ becomes a global setting as DAqReader's `refresh_hz` is.
 - **Log**: every non-measurement line heard, both directions, with its meaning;
   a guess ends in `?`, and a line not in the protocol notes is marked `!!`.
 - **Message island**: what needs saying now — a ramp whose start is not where
-  the piston is (with the speed the controller will really run at), the keypad
+  the piston is, a ramp running more than 20 % off its set speed, the keypad
   STOP being pressed, an unknown line, a test saved, a port lost.
+
+## The ramp's speed is measured, not predicted
+
+The status card shows the speed that was set and the speed the press is really
+running at: a least-squares fit of position against time over every ramp sample
+so far (operator, 2026-10-19). After 10 s of ramp the two are compared once, and
+a difference over 20 % is said out loud. It used to be *predicted* from the
+ramp's start field, a model that fitted one test and was contradicted by the
+next ([protocol notes](PROTOCOL.md)); a measurement is right whatever the
+explanation turns out to be.
 
 ## Saving
 

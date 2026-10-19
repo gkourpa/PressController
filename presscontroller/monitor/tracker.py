@@ -51,10 +51,20 @@ from presscontroller.tap.events import TapEvent
 RATE_WINDOW_S = 2.0
 
 #: How far the ramp's start may sit from where the piston is before the monitor
-#: says so. The controller runs the ramp's planned time over the distance really
-#: left (docs/PROTOCOL.md, ramp command), so a start that is off by more than
-#: noise changes the speed the specimen is loaded at.
+#: says so. What the controller does with that start is not understood
+#: (docs/PROTOCOL.md, ramp command): one such ramp ran at a fifth of its speed.
 RAMP_START_TOLERANCE_MM = 0.5
+
+#: Seconds of ramp before its measured speed is judged. Its first seconds are the
+#: servo taking up the load — 5.4 mm/min for a moment in a 3 mm/min ramp — and
+#: ten seconds of a fit over the whole ramp so far settles well inside the
+#: tolerance below.
+RAMP_JUDGE_AFTER_S = 10.0
+
+#: How far the measured speed may be from the set one before the monitor says so.
+#: The ramps seen ran within 5 % of their speed when they ran right, and at a
+#: fifth of it when they did not.
+RAMP_SPEED_TOLERANCE = 0.2
 
 #: Log entries kept for the window. A day of tests is a few thousand lines;
 #: the capture keeps everything regardless.
@@ -109,6 +119,13 @@ class TestRecord:
     ramp_from_mm: float | None = None
     """Where the piston was when the ramp was sent."""
     warnings: list[str] = field(default_factory=list)
+    ramp_judged: bool = False
+    """Whether the measured speed has been compared with the set one yet."""
+    _fit: list[float] = field(default_factory=lambda: [0.0] * 5)
+    """Running sums n, St, Sx, Stt, Stx of position against time over the ramp,
+    so its speed is a least-squares fit at any moment without a pass over it."""
+    _ramp_t: list[float] = field(default_factory=lambda: [0.0, 0.0])
+    """Test time of the ramp's first and newest sample."""
     closed: bool = False
     close_reason: str = ""
 
@@ -122,6 +139,34 @@ class TestRecord:
         self.phase.append(phase.value)
         for idx, col in self.raw.items():
             col.append(raw.get(idx))            # and one missing from a line is a gap
+
+    def fit_ramp(self, t: float, position_mm: float) -> None:
+        """Add one ramp sample to the speed fit."""
+        s = self._fit
+        if s[0] == 0:
+            self._ramp_t[0] = t
+        self._ramp_t[1] = t
+        s[0] += 1
+        s[1] += t
+        s[2] += position_mm
+        s[3] += t * t
+        s[4] += t * position_mm
+
+    @property
+    def ramp_seconds(self) -> float:
+        """How long the ramp has been measured over, in seconds."""
+        return self._ramp_t[1] - self._ramp_t[0]
+
+    @property
+    def ramp_mm_min(self) -> float | None:
+        """The speed the ramp has really run at so far: the slope of position
+        against time, least squares over every ramp sample, in mm/min. ``None``
+        before there are two samples to fit."""
+        n, st, sx, stt, stx = self._fit
+        den = n * stt - st * st
+        if n < 2 or den <= 0:
+            return None
+        return (n * stx - st * sx) / den * 60.0
 
 
 @dataclass(frozen=True)
@@ -256,8 +301,7 @@ class Monitor:
     def feed(self, ev: TapEvent) -> list[Notice]:
         msg = parse(ev.direction, ev.text)
         if isinstance(msg, Sample):
-            self._sample(ev, msg)
-            return []
+            return self._sample(ev, msg)
         known = not isinstance(msg, Unknown)
         meaning = describe(ev.direction, msg)
         who = "PC" if ev.direction == PC_TO_CTRL else "controller"
@@ -280,7 +324,7 @@ class Monitor:
             test.events.append((ev.t - test.t0, f"{who} {ev.text}: {meaning}"))
         return notices
 
-    def _sample(self, ev: TapEvent, s: Sample) -> None:
+    def _sample(self, ev: TapEvent, s: Sample) -> list[Notice]:
         self.streaming = True
         self.latest = dict(s.raw)
         self.latest_t = ev.t
@@ -291,6 +335,27 @@ class Monitor:
         test = self.current
         if test is not None:
             test.add_sample(ev.t - test.t0, s.counter, self.phase, s.raw)
+            if self.phase is Phase.RAMP and self.path_index in s.raw:
+                test.fit_ramp(ev.t - test.t0,
+                              self.value(self.path_index, s.raw[self.path_index]))
+                return self._judge_ramp(test)
+        return []
+
+    def _judge_ramp(self, test: TestRecord) -> list[Notice]:
+        """Once, after :data:`RAMP_JUDGE_AFTER_S` of ramp: say so if the press is
+        not loading at the speed that was set."""
+        if test.ramp_judged or test.ramp is None or test.ramp_seconds < RAMP_JUDGE_AFTER_S:
+            return []
+        test.ramp_judged = True
+        measured, wanted = test.ramp_mm_min, test.ramp.speed_mm_min
+        if measured is None or wanted <= 0:
+            return []
+        if abs(measured - wanted) <= RAMP_SPEED_TOLERANCE * wanted:
+            return []
+        text = (f"The ramp is running at {measured:.2f} mm/min, not the {wanted:.3g} mm/min "
+                f"set (measured over its first {test.ramp_seconds:.0f} s).")
+        test.warnings.append(text)
+        return [Notice(text, warn=True)]
 
     def _from_pc(self, ev: TapEvent, msg) -> list[Notice]:
         notices: list[Notice] = []
@@ -350,12 +415,9 @@ class Monitor:
             return []
         if abs(ramp.start_um / 1000.0 - here) <= RAMP_START_TOLERANCE_MM:
             return []
-        eff = ramp.effective_mm_min(here)
-        if eff is None:
-            return []
         text = (f"Proteus sent the ramp's start as {ramp.start_um / 1000:.3f} mm with the "
-                f"piston at {here:.3f} mm: the controller will load at about "
-                f"{eff:.2f} mm/min, not the {ramp.speed_mm_min:.3g} mm/min set.")
+                f"piston at {here:.3f} mm. Such a ramp has run at a fifth of its speed "
+                f"before; its real speed is measured under Ramp.")
         test.warnings.append(text)
         return [Notice(text, warn=True)]
 

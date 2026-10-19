@@ -34,6 +34,8 @@ def test_the_real_test_as_csv(press, tmp_path):
     assert any("#B22" in r["event"] for r in rows)
     assert any(c.startswith("# ramp sent: 167 um/s") for c in comments)
     assert any(c.startswith("# warning: Proteus sent the ramp's start as 0.000 mm") for c in comments)
+    assert any(c.startswith("# warning: The ramp is running at") for c in comments)
+    assert any(c.startswith("# ramp measured: 2.06") for c in comments)
     assert any(c.startswith("# peak force: 1515.88") for c in comments)
     assert comments[-1] == "# closed: load released"
 

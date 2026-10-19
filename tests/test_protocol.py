@@ -94,14 +94,6 @@ def test_ramp_units():
     assert Ramp(100, 79446, 100000, 0, 1).speed_mm_min == pytest.approx(6.0)
 
 
-def test_ramp_with_start_zero_runs_slow_by_the_distance_left():
-    # Step 15: sent 10 mm/min with start 0 at 79.45 mm, measured 2.06 mm/min.
-    assert Ramp(167, 0, 100000, 0, 1).effective_mm_min(79.4515) == pytest.approx(2.06, abs=0.01)
-    # Step 16: start = where the piston was, so the set speed is the real one.
-    assert Ramp(100, 79446, 100000, 0, 1).effective_mm_min(79.4465) == pytest.approx(6.0, abs=0.01)
-    assert Ramp(100, 5000, 5000, 0, 1).effective_mm_min(1.0) is None
-
-
 def test_descriptions_mark_a_guess_with_a_question_mark():
     assert describe(PC_TO_CTRL, Command(17)) == "Cancel: pump off, test ends"
     assert describe(PC_TO_CTRL, Command(20)).endswith("?")

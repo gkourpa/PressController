@@ -74,6 +74,9 @@ def write_test_csv(monitor: Monitor, test: TestRecord, folder: str | Path, *,
                       f"{r.start_um} um to {r.end_um} um, field4 {r.field4}, channel {r.channel}"
                       + (f"; piston at {test.ramp_from_mm:.3f} mm when sent"
                          if test.ramp_from_mm is not None else ""))
+    if test.ramp_mm_min is not None:
+        header.append(f"ramp measured: {test.ramp_mm_min:.3f} mm/min over "
+                      f"{test.ramp_seconds:.1f} s (least squares, path against time)")
     peak = monitor.peak(test)
     if peak is not None:
         f, t, p = peak

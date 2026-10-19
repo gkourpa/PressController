@@ -7,9 +7,10 @@ from datetime import datetime
 import pytest
 
 from presscontroller.monitor import Monitor, Phase
+from presscontroller.monitor.tracker import RAMP_JUDGE_AFTER_S, RAMP_SPEED_TOLERANCE
 from presscontroller.protocol import CTRL_TO_PC, PC_TO_CTRL, Ramp
 from presscontroller.tap import TapEvent, read_capture
-from tests.conftest import DRY_RUN, RAMP_6, REAL_TEST, replay_all
+from tests.conftest import DRY_RUN, RAMP_3, RAMP_6, REAL_TEST, replay_all
 
 
 def test_the_real_test_is_one_test_with_its_peak(press):
@@ -35,33 +36,58 @@ def test_the_phases_follow_the_test(press):
     assert m.proteus is False and m.phase is Phase.NONE
 
 
-def test_a_ramp_sent_with_start_zero_is_said_out_loud(press):
+def test_a_slow_ramp_is_measured_and_said_out_loud(press):
+    # Step 15: set 10 mm/min, sent with start 0, ran at 2.06 mm/min.
     m, notices = replay_all(press, REAL_TEST)
     test = m.tests[0]
     assert test.ramp == Ramp(167, 0, 100000, 0, 1)
     assert test.ramp_from_mm == pytest.approx(79.45, abs=0.01)
-    assert len(test.warnings) == 1
-    assert "2.06 mm/min" in test.warnings[0] and "10 mm/min" in test.warnings[0]
-    assert any(n.warn and "2.06" in n.text for n in notices)
+    assert test.ramp_mm_min == pytest.approx(2.06, abs=0.01)
+    start, speed = test.warnings
+    assert "start as 0.000 mm with the piston at 79.451 mm" in start
+    assert speed.startswith("The ramp is running at 2.") and "not the 10 mm/min set" in speed
+    assert [n.text for n in notices if n.warn] == [start, speed]
 
 
-def test_the_measured_ramp_matches_the_predicted_effective_rate(press):
-    # The prediction the warning makes is the rate the press really ran at.
+def test_the_measured_speed_is_the_slope_of_path_against_time(press):
     m, _ = replay_all(press, REAL_TEST)
     test = m.tests[0]
     path = m.series(test, m.path_index)
-    ramp = [(t, p) for t, p, ph in zip(test.t, path, test.phase)
-            if ph == Phase.RAMP.value and 210 < t < 260]
+    ramp = [(t, p) for t, p, ph in zip(test.t, path, test.phase) if ph == Phase.RAMP.value]
     (t0, p0), (t1, p1) = ramp[0], ramp[-1]
-    measured = (p1 - p0) / (t1 - t0) * 60
-    assert measured == pytest.approx(test.ramp.effective_mm_min(test.ramp_from_mm), abs=0.1)
+    assert test.ramp_mm_min == pytest.approx((p1 - p0) / (t1 - t0) * 60, rel=0.03)
+    assert test.ramp_seconds == pytest.approx(t1 - t0)
 
 
-def test_a_ramp_from_where_the_piston_is_gives_no_warning(press):
+def test_a_start_off_the_piston_is_said_even_when_the_speed_is_right(press):
+    # Step 17: start sent as exactly twice the position; the press still ran at 3.
+    m, notices = replay_all(press, RAMP_3)
+    test = m.tests[0]
+    assert test.ramp == Ramp(50, 159202, 100000, 0, 1)
+    assert test.ramp.start_um / 1000 / test.ramp_from_mm == pytest.approx(2.0, abs=1e-4)
+    assert test.ramp_mm_min == pytest.approx(3.0, abs=0.1)
+    assert len(test.warnings) == 1 and "159.202 mm" in test.warnings[0]
+    assert m.peak(test)[0] == pytest.approx(409.46, abs=0.01)
+
+
+def test_a_ramp_from_where_the_piston_is_at_its_speed_gives_no_warning(press):
     m, notices = replay_all(press, RAMP_6)
     assert [t.ramp for t in m.tests] == [None, Ramp(100, 79446, 100000, 0, 1)]
+    assert m.tests[1].ramp_mm_min == pytest.approx(6.0, rel=RAMP_SPEED_TOLERANCE)
     assert not any(t.warnings for t in m.tests)
     assert not any(n.warn for n in notices)
+
+
+def test_the_speed_is_judged_once_after_ten_seconds(press):
+    m = Monitor(press)
+    first_judged = None
+    for ev in read_capture(REAL_TEST):
+        m.feed(ev)
+        test = m.current
+        if test is not None and test.ramp_judged and first_judged is None:
+            first_judged = test.ramp_seconds
+    assert first_judged == pytest.approx(RAMP_JUDGE_AFTER_S, abs=0.3)
+    assert sum("running at" in w for w in m.tests[0].warnings) == 1
 
 
 def test_a_cancelled_start_then_a_new_start_are_two_tests(press):
