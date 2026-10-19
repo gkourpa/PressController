@@ -38,14 +38,23 @@ and undocumented, so the protocol is learnt from the live link first.
 
 ## Open questions
 
-- The start-up commands not yet explained (`#B03`, `#B09`, `#B40/41`,
-  `#B50–52`, `#D020`) — Proteus sends them identically every time, so they can
-  be replayed as they are.
+- What the controller does when a ramp reaches its end on its own (being
+  recorded, step 21).
 - What Proteus puts in the ramp's start field (0, 1 and 2 times the piston
   position); it does not set the speed (steps 17–19).
-- Why step 15's 10 mm/min path ramp on a cube ran at 2.06 mm/min, when a
-  10 mm/min ramp at low load ran correctly (step 19). The monitor measures every
-  ramp and warns when one is more than 20 % off.
-- Deformation-controlled ramps (channel 2), and what the controller does when a
-  ramp reaches its end on its own. Path and force control are decoded
-  ([steps 15–20](PROTOCOL.md)).
+
+## Accepted unknowns
+
+Decided not to pursue (operator, 2026-10-19):
+
+- **The start-up commands not yet explained** (`#B03`, `#B09`, `#B40/41`,
+  `#B50–52`, `#D020`). Proteus sends them identically every time, so they are
+  replayed as they are.
+- **Why step 15's 10 mm/min path ramp ran at 2.06 mm/min.** Proteus sent the
+  same bytes as in step 19, which ran correctly. The monitor measures every ramp
+  and warns when one is more than 20 % off, so a recurrence is caught.
+
+## Out of scope
+
+- **Deformation control** (channel 2): the lab will not use it (operator,
+  2026-10-19). Its ramps stay undecoded and are shown as raw numbers.
