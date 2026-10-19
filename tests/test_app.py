@@ -24,7 +24,7 @@ def _window(qapp, press, until=None, tests_dir=None):
     win.start()
     win._timer.stop()           # the test drives the ticks
     win.tick()
-    win._plots.flush()
+    win._display.flush()
     qapp.processEvents()
     return win
 
@@ -92,3 +92,26 @@ def test_the_plot_is_force_against_displacement():
     assert img.shape == (300, 400, 3)
     blank = render_force_displacement([], [], size_px=(400, 300), dpi=100)
     assert blank.shape == (300, 400, 3)
+
+
+def test_the_screen_is_redrawn_at_no_more_than_its_ceiling(qapp, press, monkeypatch):
+    """Data is taken in every tick; the screen only at ``refresh_hz``."""
+    from presscontroller.app.main_window import MainWindow
+    src = ReplayTap(REAL_TEST, speed=1e9)
+    win = MainWindow(Monitor(press), src, refresh_hz=2.0)
+    shown = []
+    monkeypatch.setattr(win, "_show", lambda: shown.append(win.monitor.latest_t))
+    win._display._fn = win._show
+    win.start()
+    win._timer.stop()
+    try:
+        src._events, rest = src._events[:300], src._events[300:]
+        win.tick()                         # the first redraw is immediate
+        src._events += rest
+        win.tick()                         # within the interval: held back
+        assert len(shown) == 1
+        assert win.monitor.latest_t > shown[0]      # but the data was taken in
+        win._display.flush()               # the trailing redraw shows the newest
+        assert shown[-1] == win.monitor.latest_t
+    finally:
+        win.close()

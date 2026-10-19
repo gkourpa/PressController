@@ -11,6 +11,16 @@ Stop, no Zero. Proteus stays in control. The message island says so, and names
 the source — the two ports, or the capture being replayed — so a replay is never
 mistaken for the press.
 
+## Redraw rate
+
+Everything on screen — readings, status, plot, log — is redrawn **at most twice
+a second** (operator, 2026-10-19): the stream is ten lines a second, and a number
+changing faster than it can be read is worse than one that does not. The newest
+data always wins and a trailing redraw is guaranteed. Taking in data, the
+capture and the saved tests do not wait for the screen; a message (a warning, a
+lost port) is shown at once. The ceiling is the window's `refresh_hz`, 2 Hz, and
+becomes a global setting as DAqReader's `refresh_hz` is.
+
 ## Layout
 
 - **Status card**: whether Proteus has the controller in PC mode, the data

@@ -13,10 +13,15 @@ Layout, left to right as the operator reads it:
 * the **plot** — force against displacement of the newest test — and the
   **log** of every command and event heard.
 
-Each tick polls the source, feeds every line to the monitor, saves any test the
-monitor has closed, and refreshes what changed. The readings follow every tick;
-the plot is drawn through a :class:`~presscontroller.app.widgets.Coalescer`,
-because a render is tens of milliseconds and the stream is ten lines a second.
+Each tick polls the source, feeds every line to the monitor and saves any test
+the monitor has closed — **taking in data never waits for the screen**. What is
+shown — readings, status, plot and log — is redrawn through one
+:class:`~presscontroller.app.widgets.Coalescer` at no more than ``refresh_hz``
+(:data:`REFRESH_HZ`, 2 Hz): the stream is ten lines a second, and a number
+changing faster than it can be read is worse than one that does not (operator,
+2026-10-19, as DAqReader's ``refresh_hz``). The newest data always wins and a
+trailing redraw is guaranteed, so what is on screen is never more than one
+interval old. A message — a warning, a lost port — is said at once.
 """
 
 from __future__ import annotations
@@ -51,8 +56,10 @@ from presscontroller.protocol import PC_TO_CTRL
 #: when they are polled, so this only sets how soon the window shows them.
 TICK_MS = 50
 
-#: The plot's redraw ceiling, DAqReader's default: readings, not motion.
-PLOT_HZ = 2.0
+#: The screen's redraw ceiling, in hertz — readings, status, plot and log
+#: alike. DAqReader's default for its ``refresh_hz``; it becomes a global
+#: setting the same way, and until then is the window's ``refresh_hz`` argument.
+REFRESH_HZ = 2.0
 
 #: Width of the reading column. The gauges hold a five-figure force and its
 #: unit at a size readable from the press.
@@ -68,7 +75,7 @@ def _template(rng: float, decimals: int, unit: str) -> str:
 
 class MainWindow(QMainWindow):
     def __init__(self, monitor: Monitor, source, *, tests_dir: Path | None = None,
-                 parent=None):
+                 refresh_hz: float = REFRESH_HZ, parent=None):
         super().__init__(parent)
         self.monitor = monitor
         self.source = source
@@ -168,7 +175,7 @@ class MainWindow(QMainWindow):
         self._base_message = (f"Monitor only: {source.describe()}. Nothing is sent to the "
                               "press; Proteus stays in control.")
         self.say(self._base_message)
-        self._plots = Coalescer(self._draw_plots, PLOT_HZ, self)
+        self._display = Coalescer(self._show, refresh_hz, self)
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.tick)
         self.resize(1400, 860)
@@ -189,8 +196,6 @@ class MainWindow(QMainWindow):
         notices = []
         for ev in events:
             notices += self.monitor.feed(ev)
-        if events:
-            self._append_log()
         for test in self.monitor.pop_closed():
             self._autosave(test)
         if self.source.errors and len(self.source.errors) != self._last_error_count:
@@ -200,9 +205,14 @@ class MainWindow(QMainWindow):
         elif notices:
             n = notices[-1]
             self.say(n.text, warn=n.warn)
-        self._refresh()
         if events:
-            self._plots.post()
+            self._display.post()
+
+    def _show(self) -> None:
+        """Bring everything on screen up to the monitor's state."""
+        self._append_log()
+        self._refresh()
+        self._draw_plots()
 
     def _append_log(self) -> None:
         # Counted by entries ever logged, not by the log's length: the log keeps
