@@ -209,6 +209,15 @@ this was its first test.
 | step 15 | 0× (0 mm) | 2.06 / 10 mm/min |
 | step 16 | 1× | 6 / 6 mm/min |
 | step 17 | 2× | 3.0 / 3 mm/min |
+| step 18 | 0× (0 mm) | **1.016 / 1 mm/min** |
+
+**Step 18** (`captures/20261019_160140_step18_live_monitor_1mm_min.jsonl`, first test after
+Proteus start-up, template 1 mm/min): `#D1217;0;100000;0;1` — start **0** again, as in step 15, yet
+the press ran at the **set speed** (1.016 mm/min measured over 56 s). So the start field does not
+explain step 15's slow ramp either way; it seems to be ignored or harmless. **Step 15 remains the only
+ramp that ran slow** (2.06 / 10 mm/min, from its first second and at 11 kN, so not a pump limit under
+load). Open: whether the press can run a 10 mm/min path ramp at all — repeat at 10 mm/min.
+Step 18 also had three Stop presses (`#B18` ×3) before Cancel.
 
 So the start field is **not** simply where Proteus believes the piston is, and the "duration = (end − start)
 / speed" model below fits step 15 but **not** step 17 (it would predict ~1 mm/min). Proteus' own Zero/Reset (software tare) was ruled out: neither was pressed
@@ -281,7 +290,8 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 - Which start-up command makes **PC** / **FO** appear on the controller display.
 - Meaning of display indicators ZB, (bottom) FO, LD.
 - What each start-up command means (`#B20/21`, `#B40/41`, `#B50/51/52`, `#B03`, `#B09`, `#D020`, `#D0510`).
-- What Proteus puts in the ramp's start field (0×, 1×, 2× the piston position in steps 15–17), and how the controller uses it (step 15 slowed, step 17 did not).
+- What Proteus puts in the ramp's start field (0×, 1×, 2×, 0× the piston position in steps 15–18); it does not seem to affect the speed (steps 17, 18).
+- Why step 15's 10 mm/min ramp ran at 2.06 mm/min — repeat a 10 mm/min ramp.
 - Ramp field 4 (`0`) and whether field 5 changes with Force/Deformation control.
 - Whether break detection (`#B33`) is ever enabled by a template, and what the controller sends on break.
 - Whether other keypad keys (START, ZERO, PEAK…) are forwarded like STOP (`#B28`) in PC mode.
