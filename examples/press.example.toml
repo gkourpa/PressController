@@ -1,0 +1,36 @@
+# A press file: how one press's DigiMaxx controller is reached through the tap,
+# and what its channels are. Copy it, fill in your own, and keep the copy
+# outside the repository (ports and ranges belong to an installation).
+#
+# Take the ranges and the resolution from Proteus:
+#   Configuration -> Hardware Configuration -> Machine  (DIGIMAXXResolution)
+#                                           -> Channels (Bereich1 per channel)
+name = "FORM+TEST 4000 kN"
+resolution = 600000
+
+[tap]
+pc_port = "COM1"     # the adapter whose RX hears line pin 3 (PC -> controller)
+ctrl_port = "COM2"   # the adapter whose RX hears line pin 2 (controller -> PC)
+
+# `index` is the number the controller gives the channel in its stream.
+# The monitor plots the channels named "Force" and "Path".
+[[channel]]
+index = 0
+name = "Force"
+unit = "kN"
+range = 4000.0
+decimals = 2
+
+[[channel]]
+index = 1
+name = "Path"
+unit = "mm"
+range = 100.0
+decimals = 3
+
+[[channel]]
+index = 2
+name = "Deformation"
+unit = "mm"
+range = 5.0
+decimals = 4

@@ -1,0 +1,35 @@
+[project]
+name = "presscontroller"
+# The version lives in one place, `presscontroller/__init__.py` (read below).
+dynamic = ["version"]
+description = "Talk to the FORM+TEST DigiMaxx C-20 press controller without Proteus; first, a listen-only monitor"
+requires-python = ">=3.14,<3.15"
+readme = "README.md"
+
+# Runtime deps are pinned in requirements.txt (the reproducible environment).
+# This list is the human-readable summary only.
+dependencies = [
+    "numpy",
+    "matplotlib",
+    "PySide6",
+    "pyserial",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+docs = ["reportlab"]   # only to regenerate docs/RS232_Tap_Wiring.pdf
+
+[tool.setuptools.dynamic]
+version = {attr = "presscontroller.__version__"}
+
+# `presscontroller` only — `tools/` (the sniffer) and `docs/` are the bench's,
+# not the application's.
+[tool.setuptools.packages.find]
+include = ["presscontroller*"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+addopts = "-ra"
+# The tests share their fixtures and capture paths through `tests.conftest`.
+pythonpath = ["."]
