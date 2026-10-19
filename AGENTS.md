@@ -17,11 +17,14 @@ press.
 
 ## Non-negotiable rules
 
-1. **Nothing is sent to the controller** until a milestone explicitly adds
-   sending, with its own review. The tap's code has no write path; keep it so.
-   When sending is added, it uses only commands confirmed in `docs/PROTOCOL.md`,
-   and the controller's own STOP and the press emergency stop remain the
-   primary safety devices.
+1. **Only allowlisted lines are ever sent to the controller.** The allowlist
+   (`control/commands.py`) is checked at the one place a byte leaves
+   (`ControllerLink.send`); the tap and the monitor window have no write path
+   and do not import `control`. **No motion command is on the list** until the
+   milestone that adds motion, with its own review. Every way out of PC mode —
+   disconnect, abort, keypad STOP, closing — ends with stream off and PC mode
+   off. The controller's own STOP and the press emergency stop remain the
+   primary safety devices; **PAUSE (`#B18`) is not a stop**, Cancel (`#B17`) is.
 2. A protocol meaning is **confirmed** only when the controller's display or the
    press's behaviour showed it; anything inferred from timing is a hypothesis
    and is marked so in `docs/PROTOCOL.md` and in `protocol/messages.py`
@@ -49,7 +52,8 @@ press.
 | what the controller says, command by command, and how each was learnt | [Protocol notes](docs/PROTOCOL.md) |
 | scope, decisions, milestones, open work | [Project overview](docs/project-overview.md) |
 | packages, ownership, dependency boundaries, provenance | [Architecture](docs/architecture.md) |
-| the monitor window and its rules | [The window](docs/ui.md) |
+| the monitor window, the control window and their rules | [The window](docs/ui.md) |
+| control mode: connecting without Proteus, the allowlist, the session | [Control](docs/control.md) |
 | install, commands, pytest, the sniffer, the tap's wiring | [Development and testing](docs/development-and-testing.md) |
 
 ## Default working loop

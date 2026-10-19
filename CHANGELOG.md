@@ -2,6 +2,23 @@
 
 What each version added or changed, newest first.
 
+## Unreleased
+
+### Added
+
+- **Control mode** (`--control`): the program connects to the controller itself,
+  with the old PC unplugged — Proteus' start-up replayed exactly, the live
+  readings, Peak and break detection as on/off switches, disconnect. It cannot
+  send anything that moves the press. Pressing STOP on the controller's keypad
+  hands control back to the keypad at once.
+- The press file's `[limits]`: the fastest path and force ramps allowed. The
+  monitor says so the moment a faster ramp is sent.
+
+### Changed
+
+- PAUSE / CONTINUE (`#B18`) is understood as one toggling command; the measured
+  ramp speed leaves paused time out.
+
 ## 0.0.1 — 2026-10-19
 
 ### Added

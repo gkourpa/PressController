@@ -11,6 +11,7 @@ Left out: DAqReader's ``PlotPanel``, whose buttons edit an experiment's plots.
 * :class:`ReadingLabel` / :class:`Gauge` — one number, as large as its card holds.
 * :func:`island` — the card look the table and the message share.
 * :class:`MessageIsland` — the card the window speaks from, on its bottom edge.
+* :class:`Switch` — an on/off switch with its name and its state in words.
 """
 
 from __future__ import annotations
@@ -19,8 +20,9 @@ from collections.abc import Callable
 
 import numpy as np
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QFont, QFontMetricsF, QImage, QPixmap
+from PySide6.QtGui import QColor, QFont, QFontMetricsF, QImage, QPainter, QPalette, QPixmap
 from PySide6.QtWidgets import (
+    QAbstractButton,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -545,3 +547,64 @@ class Gauge(QFrame):
         bottom = g.bottom() + GAUGE_SPACING
         self.reset_btn.setGeometry(g.left(), top, g.width(), bottom - top + 1)
         self.reset_btn.raise_()
+
+
+class Switch(QAbstractButton):
+    """An on/off switch: a sliding knob, its name, and **ON** or **OFF** in words.
+
+    Asked for as "a switch, easy for everyone to understand" (operator,
+    2026-10-19): the knob's side and colour say it at a glance, and the word says
+    it to anyone who does not read switches. The colours are the palette's —
+    highlight for on, mid for off — so it reads on either theme
+    (:mod:`presscontroller.app.theme`).
+
+    It is a checkable button, so ``toggled(bool)`` carries the new state.
+    """
+
+    TRACK_W, TRACK_H = 44, 22
+    GAP = 8
+
+    def __init__(self, name: str, parent=None):
+        super().__init__(parent)
+        self.setCheckable(True)
+        self._name = name
+        self.setText(name)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+    def state_text(self) -> str:
+        return f"{self._name}: {'ON' if self.isChecked() else 'OFF'}"
+
+    def sizeHint(self) -> QSize:
+        fm = self.fontMetrics()
+        widest = max(fm.horizontalAdvance(f"{self._name}: ON"),
+                     fm.horizontalAdvance(f"{self._name}: OFF"))
+        return QSize(self.TRACK_W + self.GAP + widest + 4,
+                     max(self.TRACK_H, fm.height()) + 4)
+
+    def paintEvent(self, _ev) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        pal = self.palette()
+        enabled = self.isEnabled()
+        on = self.isChecked()
+        track = pal.color(QPalette.ColorRole.Highlight if on else QPalette.ColorRole.Mid)
+        if not enabled:
+            track = QColor(track)
+            track.setAlpha(90)
+        y = (self.height() - self.TRACK_H) / 2
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(track)
+        p.drawRoundedRect(0, y, self.TRACK_W, self.TRACK_H, self.TRACK_H / 2, self.TRACK_H / 2)
+        d = self.TRACK_H - 6
+        x = self.TRACK_W - d - 3 if on else 3
+        p.setBrush(pal.color(QPalette.ColorRole.Base))
+        p.drawEllipse(int(x), int(y + 3), d, d)
+        p.setPen(pal.color(QPalette.ColorGroup.Active if enabled else QPalette.ColorGroup.Disabled,
+                           QPalette.ColorRole.WindowText))
+        f = self.font()
+        f.setBold(on)
+        p.setFont(f)
+        p.drawText(self.TRACK_W + self.GAP, 0, self.width() - self.TRACK_W - self.GAP,
+                   self.height(), Qt.AlignmentFlag.AlignVCenter, self.state_text())
+        p.end()

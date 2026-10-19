@@ -12,6 +12,19 @@ resolution = 600000
 pc_port = "COM1"     # the adapter whose RX hears line pin 3 (PC -> controller)
 ctrl_port = "COM2"   # the adapter whose RX hears line pin 2 (controller -> PC)
 
+# Only for control mode (python -m presscontroller.app --control), with the old
+# PC unplugged: the adapter the controller cable is plugged straight into.
+[control]
+port = "COM2"
+
+# The fastest ramps this press is to be run at. A ramp above them is said out loud
+# the moment it is sent, and this program's own START will refuse it. Under load
+# the lab's press followed about 20 mm/min at most; above that the ramp's target
+# runs ahead of the piston and PAUSE does not hold (docs/PROTOCOL.md, step 22).
+[limits]
+max_path_rate_mm_min = 10.0
+max_force_rate_kn_s = 15.0
+
 # `index` is the number the controller gives the channel in its stream.
 # The monitor plots the channels named "Force" and "Path".
 [[channel]]

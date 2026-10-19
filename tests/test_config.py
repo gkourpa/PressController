@@ -47,6 +47,17 @@ decimals = 9
         assert expected in text
 
 
+def test_limits_are_read_and_checked(tmp_path):
+    cfg, problems = load_press(EXAMPLE_PRESS)
+    assert (cfg.max_path_rate_mm_min, cfg.max_force_rate_kn_s) == (10.0, 15.0)
+    text = EXAMPLE_PRESS.read_text(encoding="utf-8").replace(
+        "max_force_rate_kn_s = 15.0", "max_force_rate_kn_s = 0.0\nspeed = 1")
+    p = _write(tmp_path, text)
+    _, problems = load_press(p)
+    assert "limits.max_force_rate_kn_s must be above zero, not 0" in problems
+    assert any("unknown key 'speed'" in x for x in problems)
+
+
 def test_a_wrong_type_is_a_config_error(tmp_path):
     p = _write(tmp_path, 'resolution = "600000"\n')
     with pytest.raises(ConfigError, match="resolution"):

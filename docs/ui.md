@@ -40,7 +40,8 @@ becomes a global setting as DAqReader's `refresh_hz` is.
   stands, so it is not blank while the piston moves.
 - **Log**: every non-measurement line heard, both directions, with its meaning;
   a guess ends in `?`, and a line not in the protocol notes is marked `!!`.
-- **Message island**: what needs saying now — a ramp running more than 20 % off
+- **Message island**: what needs saying now — a ramp sent faster than the press
+  file's `[limits]` (said the moment it is sent), a ramp running more than 20 % off
   its set speed, the keypad STOP being pressed, an unknown line, a test saved, a
   port lost.
 
@@ -48,7 +49,8 @@ becomes a global setting as DAqReader's `refresh_hz` is.
 
 The status card shows the speed that was set and the speed the press is really
 running at: a least-squares fit of position against time over every ramp sample
-so far, leaving out the ramp's first 3 s, where the servo takes up the load and
+so far on the ramp's own clock — paused time is not counted — leaving out the
+ramp's first 3 s, where the servo takes up the load and
 force can jump 8 kN (step 21) (operator, 2026-10-19). After 10 s of ramp the two are compared once, and
 a difference over 20 % is said out loud. It used to be *predicted* from the
 ramp's start field, a model that fitted one test and was contradicted by the
@@ -75,3 +77,34 @@ arrives, and every test the monitor closes is written to
 `<data>/tests/test_<START time>.csv` without being asked. A test still open when
 the window closes is saved too. A replay writes nothing on its own;
 **File → Save newest test as CSV…** saves on request.
+
+## The control window
+
+`python -m presscontroller.app --control`, with the old PC unplugged from the
+controller and the controller cable plugged into the press file's
+`[control] port`. Every launch asks that to be confirmed first. The window is the
+monitor's, with a bar on top:
+
+- **Controller: …** — the session's state (not connected, checking the line is
+  free, connecting, connected in PC mode, refused or aborted).
+- **Break detection** and **Peak** — on/off **switches** with the state in words
+  (operator, 2026-10-19: "a switch, easy for everyone to understand"). The
+  controller does not report either, so the program *sets* them to the switches'
+  positions as it connects and on every flip; a switch never shows a guess.
+  Break detection starts on, Peak off — the controller's power-up defaults. A
+  switch flipped while not connected is applied on connecting.
+- **Connect** / **Disconnect**.
+
+This version has no control that moves the press. The test controls come with
+the motion milestone, named as the operator asked (2026-10-19):
+
+| Button | Sends | Notes |
+| --- | --- | --- |
+| **START** | `#B47`, `#B30`/`#B32`, `#D0910`, `#B23` | approach to the start load |
+| **CONTINUE** (after the start load) | `#D0520`, the ramp `#D12…`, `#B22` | the test itself |
+| **PAUSE** / **CONTINUE** (during the ramp) | `#B18` | one toggling command; freezes the ramp's target |
+| **STOP** | `#B17` | Proteus' "Cancel": pump off, load released. The real stop |
+
+**PAUSE is not a safety stop**: it freezes the ramp's target, so a piston that
+lags its target keeps going (step 22). STOP is Cancel. START will refuse a ramp
+above the press file's `[limits]`.

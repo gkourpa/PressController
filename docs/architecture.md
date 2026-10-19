@@ -12,6 +12,10 @@ presscontroller/
              ReplayTap of a capture, and the capture format both share
   monitor/   the Qt-free logic of the monitor: link state, test phases, each
              test's record (tracker.py), and a test as CSV (csvfile.py)
+  control/   talking to the controller ourselves: the allowlist
+             (commands.py), the one port that writes (link.py), and the
+             connect / disconnect / keypad-STOP state machine (session.py);
+             Qt-free
   app/       the Qt window; plot.py draws to an ndarray (Qt-free), theme.py and
              widgets.py come from DAqReader
 tools/       sniff.py, the bench sniffer the protocol was learnt with
@@ -26,7 +30,8 @@ data/        the lab's own press file (git-ignored)
 
 ```text
 app (Qt)  ->  monitor  ->  tap  ->  protocol
-                 \-> config
+   |             \-> config
+   \-> control (control window only)  ->  tap, protocol
 ```
 
 - `protocol` imports nothing of this package's but itself.
@@ -38,6 +43,12 @@ app (Qt)  ->  monitor  ->  tap  ->  protocol
   load without it.
 - One place says what a line means: `protocol/messages.py` (`COMMANDS`,
   `PARAMS`). The window shows `describe()`; it never interprets a line itself.
+- One place may write to a port: `control/link.py`, and only lines in
+  `control/commands.ALLOWED`. The monitor window (`app/main_window.py`) does not
+  import `control`; a test checks it in a fresh interpreter.
+- `ControllerSession` has the tap's surface (`start / poll / close / describe /
+  errors`) and hands out what it sends as `PC>CTRL` lines, so the monitor
+  follows our own session exactly as it follows Proteus'.
 - One place decides a colour: `app/theme.py`.
 
 ## Provenance

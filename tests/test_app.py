@@ -7,6 +7,7 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest  # noqa: E402
+from PySide6.QtWidgets import QPushButton  # noqa: E402
 
 from presscontroller.monitor import Monitor  # noqa: E402
 from presscontroller.tap import ReplayTap  # noqa: E402
@@ -154,3 +155,44 @@ def test_a_force_ramp_on_the_ramp_line(qapp, press):
         assert "Warning" not in text
     finally:
         win.close()
+
+
+def test_the_control_window_connects_switches_and_disconnects_on_close(qapp, press, monkeypatch):
+    import time
+
+    from presscontroller.app.control_window import ControlWindow
+    from presscontroller.control import ControllerLink, ControllerSession, SessionState
+    from presscontroller.control import session as session_mod
+    from tests.controller_fake import FakeController
+
+    monkeypatch.setattr(session_mod, "LISTEN_FIRST_S", 0.05)
+    fake = FakeController()
+    session = ControllerSession(ControllerLink("COM9", open_port=lambda name: fake))
+    win = ControlWindow(Monitor(press), session)
+    win.start()
+    win._timer.stop()
+    try:
+        assert "CONTROL (no motion)" in win.windowTitle()
+        assert win.connect_btn.isEnabled() and not win.disconnect_btn.isEnabled()
+        assert win.break_switch.isChecked() and not win.peak_switch.isChecked()
+        assert win.break_switch.state_text() == "Break detection: ON"
+        win.connect_btn.click()
+        end = time.monotonic() + 3.0
+        while session.state is not SessionState.CONNECTED and time.monotonic() < end:
+            win.tick()
+            time.sleep(0.01)
+        win.tick()
+        assert session.state is SessionState.CONNECTED
+        assert win.state_lbl.text() == "Controller: connected, in PC mode"
+        assert win.disconnect_btn.isEnabled()
+        assert not win.connect_btn.isEnabled()
+        assert "Connected" in win.message.text()
+        win.peak_switch.click()
+        win.break_switch.click()
+        assert fake.peak and not fake.break_detection
+        assert win.break_switch.state_text() == "Break detection: OFF"
+        texts = sorted(b.text() for b in win.findChildren(QPushButton) if b.text())
+        assert texts == ["Connect", "Disconnect"]
+    finally:
+        win.close()
+    assert fake.written[-2:] == ["#B36", "#B21"] and not fake.pc_mode

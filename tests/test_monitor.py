@@ -18,6 +18,8 @@ from tests.conftest import (
     DRY_RUN,
     FORCE_2_TO_END,
     FORCE_5,
+    PATH_2_PAUSE,
+    PATH_120_LAG,
     RAMP_3,
     RAMP_6,
     REAL_TEST,
@@ -275,3 +277,44 @@ def test_the_take_up_at_a_ramp_start_is_no_false_alarm(press):
 def test_the_first_seconds_of_a_ramp_are_not_in_its_rate(press):
     m, _ = _force_ramp(press, rate_kn_s=5.0, seconds=RAMP_SETTLE_S - 0.5)
     assert m.tests[0].ramp_kn_s is None and m.tests[0].ramp_seconds > 0
+
+
+def test_pause_and_continue_are_one_toggling_command(press):
+    # Step 23: #B18 four times — pause, continue, pause, continue — then Cancel.
+    m = Monitor(press)
+    phases = []
+    for ev in read_capture(PATH_2_PAUSE):
+        m.feed(ev)
+        if ev.text == "#B18":
+            phases.append(m.phase)
+    assert phases == [Phase.HELD, Phase.RAMP, Phase.HELD, Phase.RAMP]
+    assert m.log[-1].meaning.startswith("PAUSE / CONTINUE") or any(
+        e.meaning.startswith("PAUSE / CONTINUE") for e in m.log)
+
+
+def test_paused_time_is_not_in_the_measured_ramp_speed(press):
+    m, notices = replay_all(press, PATH_2_PAUSE)
+    test = m.tests[0]
+    assert test.ramp == Ramp(33, 0, 100000, 0, 1)            # 1.98 mm/min
+    assert test.ramp_mm_min == pytest.approx(1.98, rel=0.05)
+    assert test.ramp_seconds == pytest.approx(48.6, abs=0.5)  # 64 s of test, 15 s paused
+    assert test.warnings == []
+
+
+def test_a_ramp_above_the_press_limits_is_said_at_once(press):
+    # Step 22: path control at 2 mm/s instead of 2 mm/min.
+    m = Monitor(press)
+    for ev in read_capture(PATH_120_LAG):
+        notices = m.feed(ev)
+        if ev.text.startswith("#D12"):
+            break
+    [n] = notices
+    assert n.warn and n.text.startswith("Path ramp sent at 120 mm/min, above this press's "
+                                        "limit of 10 mm/min")
+    assert "PAUSE will not hold" in n.text
+
+
+def test_a_ramp_at_the_limit_is_not_a_breach(press):
+    # 10 mm/min is sent as 167 um/s, which is 10.02 mm/min: rounding, not a breach.
+    m, _ = replay_all(press, REAL_TEST)
+    assert not any("limit" in w for w in m.tests[0].warnings)

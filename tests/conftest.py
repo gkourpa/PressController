@@ -2,7 +2,7 @@
 
 Ordinary tests never open a serial port and never touch the operator's settings.
 The captures in ``tests/data`` are real recordings from the tap
-(docs/PROTOCOL.md, steps 13, 15, 16, 17, 20 and 21), so the monitor is tested on what the
+(docs/PROTOCOL.md, steps 13, 15–17 and 20–23), so the monitor is tested on what the
 press really said.
 """
 
@@ -27,6 +27,10 @@ RAMP_3 = DATA / "ramp_3mm_min_start_doubled.jsonl"
 FORCE_5 = DATA / "force_5kn_s.jsonl"
 #: Step 21: a force ramp, 2 kN/s to 100 kN, left to reach its end by itself.
 FORCE_2_TO_END = DATA / "force_2kn_s_to_end.jsonl"
+#: Step 22: a path ramp set at 2 mm/s (120 mm/min) by mistake; PAUSE did not hold.
+PATH_120_LAG = DATA / "path_120mm_min_pause_lag.jsonl"
+#: Step 23: a 2 mm/min path ramp paused and continued twice (#B18 toggles), then Cancel.
+PATH_2_PAUSE = DATA / "path_2mm_min_pause_resume.jsonl"
 #: Step 13: START with no specimen, then Cancel during the approach.
 DRY_RUN = DATA / "dryrun_start_cancel.jsonl"
 

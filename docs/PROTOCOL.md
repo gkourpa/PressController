@@ -249,6 +249,25 @@ controller sent **`#B02` — ramp end reached** (new, controller-initiated); **1
 and **`#B17`** (Cancel), and the load was released (98 → 2 kN within 3 s). The operator pressed
 nothing: **a force test ends by itself at its end force**, with Proteus driving the end.
 
+**Step 22 — a path ramp at 120 mm/min by mistake** (`captures/20261019_170350_step22_path_120mm_min_pause_lag.jsonl`):
+the template was on Path with 2 mm/**s** instead of 2 mm/min, so Proteus sent `#D122000;0;100000;0;1`
+(2000 µm/s). On the cube the piston followed only about **20 mm/min** (17 mm/min fitted) and force rose
+at ~65 kN/s. The operator pressed Stop (`#B18`) at 174 kN — and **the load kept rising to 464 kN** for
+4.4 s, the piston moving another 1.6 mm, until Cancel (`#B17`) released it (464 → 34 kN in 1.5 s).
+
+**Step 23 — PAUSE / CONTINUE** (`captures/20261019_170652_step23_path_2mm_min_pause_resume.jsonl`,
+Path 2 mm/min, `#D1233;0;100000;0;1`): `#B18` four times — the force held at ~100 kN, rose again to
+208 kN, held at ~190 kN, rose to 282 kN — then Cancel. **`#B18` toggles pause and continue**: one
+button in Proteus, one command (operator). Measured with the paused time left out, the ramp ran at
+1.95 mm/min.
+
+**Why PAUSE held in step 23 and not in step 22:** pausing freezes the ramp's **target**, not the piston.
+At 2 mm/min the piston follows its target closely, so it stops at once. At 120 mm/min the target ran
+ahead at 2 mm/s while the piston managed ~0.35 mm/s, so when the target was frozen 3.6 s into the ramp
+it was ~6 mm ahead, and the piston went on after it. **PAUSE is not a stop; Cancel (`#B17`) is.** And a
+ramp must never be set faster than the press can follow under load (≈ 20 mm/min on a cube): the press
+file's `[limits]` say how fast is allowed, and a faster ramp is said the moment it is sent.
+
 At a ramp's start the servo takes up the load: force dipped 11.8 → 10.9 kN, then jumped to 19.4 kN,
 before rising at 2 kN/s. The monitor leaves a ramp's first 3 s out of its measured rate.
 
@@ -306,7 +325,7 @@ Operator procedure after a test: exit the test in Proteus, then press **STOP on 
 | `#B35` | CTRL | answer to the ramp definition | hypothesis |
 | `#B43` | CTRL | test over, load released | hypothesis |
 | `#B17` | PC | Cancel: pump off, test ends | confirmed |
-| `#B18` | PC | Stop: piston held | confirmed |
+| `#B18` | PC | PAUSE / CONTINUE, toggling; freezes the ramp's target, so it does not hold a piston that lags it | confirmed (steps 22, 23) |
 | `#B20` / `#B21` | PC | PC mode on / off | hypothesis |
 | `#B22` | PC | start the ramp | confirmed |
 | `#B23` | PC | start the approach | confirmed |

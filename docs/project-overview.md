@@ -32,8 +32,16 @@ and undocumented, so the protocol is learnt from the live link first.
    the log, a capture and a CSV per test, and the ramp's measured speed beside
    the set one with a warning when they differ. First run live on 2026-10-19
    (step 17).
-3. **Run a test without Proteus.** Send the confirmed commands, in a supervised
-   session, with the controller's STOP and the emergency stop at hand.
+3. **Run a test without Proteus.**
+   - **3a. Connect without motion.** Written and tested against a simulated
+     controller ([control](control.md)): Proteus' start-up replayed byte for
+     byte, the stream, Peak and break detection switches, disconnect; an
+     allowlist with no motion command; keypad STOP and every way out hand
+     control back. Not yet run on the press.
+   - **3b. Motion.** START / PAUSE / CONTINUE / STOP as the operator named them
+     ([the window](ui.md#the-control-window)); ramp limits enforced before START;
+     the controller's `#B02` (ramp end) answered with `#B26` and Cancel, as
+     Proteus does.
 4. A test editor, results and reports to replace what operators use in Proteus.
 5. Frozen Windows build and installer, as DAqReader's.
 

@@ -85,7 +85,7 @@ class MainWindow(QMainWindow):
         self._ramp_warn: bool | None = None
         self._last_error_count = 0
         press = monitor.press
-        self.setWindowTitle(f"{DISPLAY_NAME} — {press.name} — monitor (listen-only)")
+        self.setWindowTitle(f"{DISPLAY_NAME} — {press.name} — {self.mode_title}")
 
         # ---- status card ---------------------------------------------------
         self.link_lbl = QLabel("–")
@@ -97,7 +97,7 @@ class MainWindow(QMainWindow):
         status = QWidget()
         grid = QGridLayout(status)
         grid.setContentsMargins(10, 6, 10, 6)
-        for row, (name, lbl) in enumerate([("Proteus", self.link_lbl),
+        for row, (name, lbl) in enumerate([("Link", self.link_lbl),
                                            ("Phase", self.phase_lbl),
                                            ("Test", self.test_lbl),
                                            ("Ramp", self.ramp_lbl),
@@ -153,6 +153,8 @@ class MainWindow(QMainWindow):
         body.addWidget(right, 1)
         self.message = MessageIsland()
         root = QVBoxLayout()
+        self._root = root
+        """The window's outer column, so a mode can put its own bar on top."""
         root.addLayout(body, 1)
         root.addWidget(self.message)
         central = QWidget()
@@ -172,13 +174,24 @@ class MainWindow(QMainWindow):
         menu.addSeparator()
         menu.addAction(quit_)
 
-        self._base_message = (f"Monitor only: {source.describe()}. Nothing is sent to the "
-                              "press; Proteus stays in control.")
+        self._base_message = self.intro()
         self.say(self._base_message)
         self._display = Coalescer(self._show, refresh_hz, self)
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.tick)
         self.resize(1400, 860)
+
+    #: What the title bar calls this window's mode.
+    mode_title = "monitor (listen-only)"
+
+    def intro(self) -> str:
+        """What the message island says first: the mode and the source."""
+        return (f"Monitor only: {self.source.describe()}. Nothing is sent to the press; "
+                "Proteus stays in control.")
+
+    def port_lost(self, error: str) -> str:
+        return (f"{error}. The monitor has stopped hearing that direction; Proteus and the "
+                "press are not affected.")
 
     # ---- running -----------------------------------------------------------
 
@@ -200,8 +213,7 @@ class MainWindow(QMainWindow):
             self._autosave(test)
         if self.source.errors and len(self.source.errors) != self._last_error_count:
             self._last_error_count = len(self.source.errors)
-            self.say(self.source.errors[-1] + ". The monitor has stopped hearing that "
-                     "direction; Proteus and the press are not affected.", error=True)
+            self.say(self.port_lost(self.source.errors[-1]), error=True)
         elif notices:
             n = notices[-1]
             self.say(n.text, warn=n.warn)

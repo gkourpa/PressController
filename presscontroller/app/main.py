@@ -5,6 +5,13 @@
     python -m presscontroller.app                       # the live tap
     python -m presscontroller.app --replay CAPTURE.jsonl [--speed 10]
     python -m presscontroller.app --press PRESS.toml    # another press file
+    python -m presscontroller.app --control             # this program in charge
+
+**Control mode** talks to the controller itself, through the press file's
+``[control] port``, with the old PC unplugged. It asks for that to be confirmed
+on every launch, and can send nothing that moves the press
+(:mod:`presscontroller.control`). Its captures and tests go where the monitor's
+do, named ``*_control.jsonl``.
 
 The press file and the data folder are asked for once and remembered in the
 global settings. Live, every byte heard goes to ``<data>/captures/`` and every
@@ -39,6 +46,8 @@ def _args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--press", help="the press file to use (else the one used last)")
     p.add_argument("--replay", help="replay a capture instead of listening to the tap")
     p.add_argument("--speed", type=float, default=1.0, help="replay speed (default 1)")
+    p.add_argument("--control", action="store_true",
+                   help="talk to the controller ourselves (old PC unplugged); no motion")
     return p.parse_args(argv)
 
 
@@ -87,6 +96,12 @@ def main(argv: list[str] | None = None) -> int:
     press, press_path = chosen
     settings = replace(settings, press_file=press_path)
 
+    if args.control and args.replay:
+        QMessageBox.warning(None, DISPLAY_NAME, "--control and --replay cannot be used together.")
+        return 1
+    if args.control:
+        return _run_control(app, settings, press)
+
     tests_dir = None
     if args.replay:
         source = ReplayTap(args.replay, speed=args.speed)
@@ -112,6 +127,56 @@ def main(argv: list[str] | None = None) -> int:
                              f"The tap could not be opened: {exc}\n\nCheck that both USB "
                              f"adapters are plugged in and that {press.pc_port} and "
                              f"{press.ctrl_port} are the ports named in the press file.")
+        return 1
+    win.show()
+    return app.exec()
+
+
+CONFIRM_CONTROL = """Control mode: this program will talk to the controller itself.
+
+Before continuing, check:
+  • the old PC is unplugged from the controller cable;
+  • the controller cable is plugged straight into the adapter on {port};
+  • the press is idle and nobody is at it.
+
+This version can connect, show the measurements and switch Peak and break
+detection. It cannot send anything that moves the press. Pressing STOP on the
+controller's keypad hands control back to the keypad at once.
+
+Continue?"""
+
+
+def _run_control(app, settings, press: PressConfig) -> int:
+    from presscontroller.app.control_window import ControlWindow
+    from presscontroller.control import ControllerLink, ControllerSession
+
+    if not press.control_port.strip():
+        QMessageBox.warning(None, DISPLAY_NAME, "The press file has no [control] port: name "
+                            "the adapter the controller cable is plugged into.")
+        return 1
+    answer = QMessageBox.question(None, DISPLAY_NAME,
+                                  CONFIRM_CONTROL.format(port=press.control_port))
+    if answer != QMessageBox.StandardButton.Yes:
+        return 0
+    data_dir = _choose_data_dir(settings)
+    if data_dir is None:
+        return 0
+    settings = replace(settings, data_dir=data_dir)
+    save_settings(settings)
+    start = datetime.now()
+    capture = CaptureWriter(
+        Path(data_dir) / "captures" / f"{start:%Y%m%d_%H%M%S}_control.jsonl",
+        ports={"control": press.control_port}, settings=LINE_SETTINGS, start=start)
+    session = ControllerSession(ControllerLink(press.control_port, capture=capture))
+    win = ControlWindow(Monitor(press), session, tests_dir=Path(data_dir) / "tests")
+    try:
+        win.start()
+    except Exception as exc:
+        session.close()
+        QMessageBox.critical(None, DISPLAY_NAME,
+                             f"{press.control_port} could not be opened: {exc}\n\nIs the "
+                             "adapter plugged in, and is the monitor or the sniffer still "
+                             "using it?")
         return 1
     win.show()
     return app.exec()

@@ -11,7 +11,7 @@ CTRL ``#B01``         start load reached          ``AT_START_LOAD``
 PC ``#D12…``          the ramp's definition       (kept on the test)
 PC ``#B22``           ramp starts                 ``RAMP``
 CTRL ``#B02``         ramp end reached            ``RAMP_END``
-PC ``#B18``           Stop: piston held           ``HELD``
+PC ``#B18``           PAUSE / CONTINUE (toggles)  ``HELD`` ⇄ the phase before
 PC ``#B17``           Cancel: pump off            ``CANCELLED``
 CTRL ``#B43``         load released               the test is closed
 ====================  ==========================  ==============================
@@ -81,7 +81,7 @@ class Phase(Enum):
     AT_START_LOAD = "start load reached"
     RAMP = "ramp"
     RAMP_END = "ramp end reached"
-    HELD = "stopped, load held"
+    HELD = "paused"
     CANCELLED = "cancelled"
     CLOSED = "test over"
 
@@ -130,8 +130,10 @@ class TestRecord:
     so its speed is a least-squares fit at any moment without a pass over it."""
     _fit_force: list[float] = field(default_factory=lambda: [0.0] * 5)
     """The same sums for force against time: the measured rate of a force ramp."""
-    _ramp_t: list[float] = field(default_factory=lambda: [-1.0, 0.0])
-    """Test time of the ramp's first and newest sample (first is -1 before one)."""
+    _ramp_clock: float = 0.0
+    """Seconds the ramp has actually run: paused time is not counted."""
+    _ramp_last: float | None = None
+    """Test time of the newest ramp sample, ``None`` after a pause."""
     closed: bool = False
     close_reason: str = ""
 
@@ -148,26 +150,36 @@ class TestRecord:
 
     def fit_ramp(self, t: float, position_mm: float | None, force_kn: float | None) -> None:
         """Add one ramp sample to the rate fits, once the ramp has settled
-        (:data:`RAMP_SETTLE_S`)."""
-        if self._ramp_t[0] < 0:
-            self._ramp_t[0] = t
-        self._ramp_t[1] = t
-        if t - self._ramp_t[0] < RAMP_SETTLE_S:
+        (:data:`RAMP_SETTLE_S`).
+
+        The fit's time axis is the **ramp's own clock**, which stops while the
+        ramp is paused: a pause holds position and force still while wall time
+        runs on, and fitting against wall time would read it as a slower ramp.
+        """
+        if self._ramp_last is not None:
+            self._ramp_clock += t - self._ramp_last
+        self._ramp_last = t
+        if self._ramp_clock < RAMP_SETTLE_S:
             return
+        r = self._ramp_clock
         for s, x in ((self._fit, position_mm), (self._fit_force, force_kn)):
             if x is None:
                 continue
             s[0] += 1
-            s[1] += t
+            s[1] += r
             s[2] += x
-            s[3] += t * t
-            s[4] += t * x
+            s[3] += r * r
+            s[4] += r * x
+
+    def pause_ramp(self) -> None:
+        """The ramp's clock stops: the next ramp sample starts it again."""
+        self._ramp_last = None
 
     @property
     def ramp_seconds(self) -> float:
-        """How long the ramp has run, in seconds (its first
+        """How long the ramp has run, in seconds, pauses not counted (its first
         :data:`RAMP_SETTLE_S` are not in the measured rate)."""
-        return max(0.0, self._ramp_t[1] - self._ramp_t[0]) if self._ramp_t[0] >= 0 else 0.0
+        return self._ramp_clock
 
     @property
     def ramp_mm_min(self) -> float | None:
@@ -214,6 +226,7 @@ class Monitor:
         self.streaming = False
         self.interval_ms: int | None = None
         self.phase = Phase.NONE
+        self._before_pause = Phase.NONE
         self.latest: dict[int, int] = {}
         self.latest_t: float | None = None
         self.latest_counter: int | None = None
@@ -442,7 +455,15 @@ class Monitor:
                 self._ensure_test(ev)
                 self.phase = Phase.RAMP
             case Command(18):
-                self.phase = Phase.HELD
+                # One button and one command in Proteus, toggling (operator,
+                # 2026-10-19; step 23): pause, then continue where it was.
+                if self.phase is Phase.HELD:
+                    self.phase = self._before_pause
+                else:
+                    self._before_pause = self.phase
+                    self.phase = Phase.HELD
+                    if self.current is not None:
+                        self.current.pause_ramp()
             case Command(17):
                 self.phase = Phase.CANCELLED
             case SetParam(5, value):
@@ -480,7 +501,32 @@ class Monitor:
         test = self._ensure_test(ev)
         test.ramp = ramp
         test.ramp_from_mm = self.latest_value(self.path_index)
-        return []
+        return self._check_limits(test)
+
+    def _check_limits(self, test: TestRecord) -> list[Notice]:
+        """Say at once — before the ramp has run a second — a ramp sent faster
+        than the press file's ``[limits]``. Waiting to measure it is too late:
+        the 120 mm/min ramp of step 22 reached 464 kN in 8 s, and PAUSE did not
+        hold it."""
+        if not self.ramp_decoded(test):
+            return []
+        r = test.ramp
+        if r.channel == self.path_index:
+            limit, unit = self.press.max_path_rate_mm_min, "mm"
+            per_s = None if limit is None else limit / 60
+        else:
+            limit, unit = self.press.max_force_rate_kn_s, self.press.channel(r.channel).unit
+            per_s = limit
+        # The speed is sent in whole thousandths per second, so 10 mm/min goes
+        # out as 167 µm/s (10.02 mm/min): one count of rounding is not a breach.
+        if per_s is None or r.speed <= round(per_s * 1000) + 1:
+            return []
+        name = self.press.channel(r.channel).name
+        text = (f"{name} ramp sent at {rate_text(r.rate, unit)}, above this press's limit of "
+                f"{rate_text(per_s, unit)}. Check the template's control and units. If the "
+                "piston cannot follow, PAUSE will not hold it: use STOP (Cancel).")
+        test.warnings.append(text)
+        return [Notice(text, warn=True)]
 
     def _ensure_test(self, ev: TapEvent) -> TestRecord:
         """The open test, or one opened now for a test already running when the
