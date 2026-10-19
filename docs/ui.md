@@ -48,7 +48,8 @@ becomes a global setting as DAqReader's `refresh_hz` is.
 
 The status card shows the speed that was set and the speed the press is really
 running at: a least-squares fit of position against time over every ramp sample
-so far (operator, 2026-10-19). After 10 s of ramp the two are compared once, and
+so far, leaving out the ramp's first 3 s, where the servo takes up the load and
+force can jump 8 kN (step 21) (operator, 2026-10-19). After 10 s of ramp the two are compared once, and
 a difference over 20 % is said out loud. It used to be *predicted* from the
 ramp's start field, a model that fitted one test and was contradicted by the
 next ([protocol notes](PROTOCOL.md)); a measurement is right whatever the

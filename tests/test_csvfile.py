@@ -36,7 +36,7 @@ def test_the_real_test_as_csv(press, tmp_path):
                             "field4 0 = 10 mm/min from 0 to 100 mm (thousandths of mm)")
                and c.endswith("piston at 79.451 mm when sent") for c in comments)
     assert any(c.startswith("# warning: The ramp is running at") for c in comments)
-    assert any(c.startswith("# ramp measured: 2.06") for c in comments)
+    assert any(c.startswith("# ramp measured: 2.05") for c in comments)
     assert any(c.startswith("# peak force: 1515.88") for c in comments)
     assert comments[-1] == "# closed: load released"
 

@@ -149,7 +149,7 @@ def test_a_force_ramp_on_the_ramp_line(qapp, press):
         win.tick()
         win._display.flush()
         text = win.ramp_lbl.text()
-        assert text.startswith("Force control: set 5 kN/s · measured 5.0")
+        assert text.startswith("Force control: set 5 kN/s · measured 4.99 kN/s")
         assert "to 300.00 kN; start sent 0.00 kN; path 4." in text
         assert "Warning" not in text
     finally:

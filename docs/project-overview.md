@@ -27,7 +27,8 @@ and undocumented, so the protocol is learnt from the live link first.
    scaling, start-up and shut-down, START/approach, start load, the ramp and its
    encoding, Stop, Cancel, Peak, break detection, the keypad STOP.
 2. **Listen-only monitor.** Written and tested on real captures (version 0.0.1):
-   live readings, test phase, ramp decoding, peak, a force–displacement plot,
+   live readings, test phase (including the controller's "ramp end reached"),
+   ramp decoding, peak, a force–displacement plot,
    the log, a capture and a CSV per test, and the ramp's measured speed beside
    the set one with a warning when they differ. First run live on 2026-10-19
    (step 17).
@@ -38,8 +39,6 @@ and undocumented, so the protocol is learnt from the live link first.
 
 ## Open questions
 
-- What the controller does when a ramp reaches its end on its own (being
-  recorded, step 21).
 - What Proteus puts in the ramp's start field (0, 1 and 2 times the piston
   position); it does not set the speed (steps 17–19).
 

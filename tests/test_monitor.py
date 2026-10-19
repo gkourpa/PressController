@@ -7,10 +7,22 @@ from datetime import datetime
 import pytest
 
 from presscontroller.monitor import Monitor, Phase
-from presscontroller.monitor.tracker import RAMP_JUDGE_AFTER_S, RAMP_SPEED_TOLERANCE
+from presscontroller.monitor.tracker import (
+    RAMP_JUDGE_AFTER_S,
+    RAMP_SETTLE_S,
+    RAMP_SPEED_TOLERANCE,
+)
 from presscontroller.protocol import CTRL_TO_PC, PC_TO_CTRL, Ramp
 from presscontroller.tap import TapEvent, read_capture
-from tests.conftest import DRY_RUN, FORCE_5, RAMP_3, RAMP_6, REAL_TEST, replay_all
+from tests.conftest import (
+    DRY_RUN,
+    FORCE_2_TO_END,
+    FORCE_5,
+    RAMP_3,
+    RAMP_6,
+    REAL_TEST,
+    replay_all,
+)
 
 
 def test_the_real_test_is_one_test_with_its_peak(press):
@@ -227,6 +239,39 @@ def test_the_real_force_ramp(press):
     m, notices = replay_all(press, FORCE_5)
     test = m.tests[0]
     assert test.ramp == Ramp(5000, 0, 300000, 0, 0)
-    assert m.ramp_measured(test) == pytest.approx(5.03, abs=0.01)
+    assert m.ramp_measured(test) == pytest.approx(4.99, abs=0.01)
     assert test.warnings == [] and not any(n.warn for n in notices)
     assert m.peak(test)[0] == pytest.approx(247.27, abs=0.01)
+
+
+def test_a_ramp_left_to_reach_its_end(press):
+    # Step 21: 2 kN/s to 100 kN; the controller says #B02 at the end, Proteus
+    # answers #B26 and cancels by itself.
+    m, notices = replay_all(press, FORCE_2_TO_END)
+    test = m.tests[0]
+    assert test.ramp == Ramp(2000, 0, 100000, 0, 0)
+    assert m.unknown_lines == 0
+    assert [e.meaning for e in m.log if e.text in ("#B02", "#B26")] == [
+        "ramp end reached", "test finished (answer to ramp end)?"]
+    assert m.peak(test)[0] == pytest.approx(99.67, abs=0.01)
+    # Proteus cancels 20 ms after #B02, before the next sample, so the phase is
+    # seen at the moment #B02 is heard rather than on any sample.
+    m2 = Monitor(press)
+    for ev in read_capture(FORCE_2_TO_END):
+        m2.feed(ev)
+        if ev.text == "#B02":
+            break
+    assert m2.phase is Phase.RAMP_END
+
+
+def test_the_take_up_at_a_ramp_start_is_no_false_alarm(press):
+    # Step 21's first seconds: force dips, then jumps 8 kN, before rising at 2 kN/s.
+    m, notices = replay_all(press, FORCE_2_TO_END)
+    test = m.tests[0]
+    assert m.ramp_measured(test) == pytest.approx(2.0, abs=0.05)
+    assert test.warnings == [] and not any(n.warn for n in notices)
+
+
+def test_the_first_seconds_of_a_ramp_are_not_in_its_rate(press):
+    m, _ = _force_ramp(press, rate_kn_s=5.0, seconds=RAMP_SETTLE_S - 0.5)
+    assert m.tests[0].ramp_kn_s is None and m.tests[0].ramp_seconds > 0

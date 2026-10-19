@@ -10,6 +10,7 @@ PC ``#B23``           approach starts             ``APPROACH``
 CTRL ``#B01``         start load reached          ``AT_START_LOAD``
 PC ``#D12…``          the ramp's definition       (kept on the test)
 PC ``#B22``           ramp starts                 ``RAMP``
+CTRL ``#B02``         ramp end reached            ``RAMP_END``
 PC ``#B18``           Stop: piston held           ``HELD``
 PC ``#B17``           Cancel: pump off            ``CANCELLED``
 CTRL ``#B43``         load released               the test is closed
@@ -52,10 +53,15 @@ from presscontroller.tap.events import TapEvent
 #: change of speed shows within it.
 RATE_WINDOW_S = 2.0
 
-#: Seconds of ramp before its measured speed is judged. Its first seconds are the
-#: servo taking up the load — 5.4 mm/min for a moment in a 3 mm/min ramp — and
-#: ten seconds of a fit over the whole ramp so far settles well inside the
-#: tolerance below.
+#: Seconds at the start of a ramp left out of its measured rate. They are the
+#: servo taking up the load — 5.4 mm/min for a moment in a 3 mm/min ramp, force
+#: dipping and then jumping 8 kN at the start of a 2 kN/s ramp (step 21) — and
+#: they say nothing about the rate the ramp then holds.
+RAMP_SETTLE_S = 3.0
+
+#: Seconds of ramp before its measured rate is judged: the settling above plus
+#: seven seconds of fit, which lands well inside the tolerance below on every
+#: ramp recorded.
 RAMP_JUDGE_AFTER_S = 10.0
 
 #: How far the measured speed may be from the set one before the monitor says so.
@@ -74,6 +80,7 @@ class Phase(Enum):
     APPROACH = "approach"
     AT_START_LOAD = "start load reached"
     RAMP = "ramp"
+    RAMP_END = "ramp end reached"
     HELD = "stopped, load held"
     CANCELLED = "cancelled"
     CLOSED = "test over"
@@ -123,8 +130,8 @@ class TestRecord:
     so its speed is a least-squares fit at any moment without a pass over it."""
     _fit_force: list[float] = field(default_factory=lambda: [0.0] * 5)
     """The same sums for force against time: the measured rate of a force ramp."""
-    _ramp_t: list[float] = field(default_factory=lambda: [0.0, 0.0])
-    """Test time of the ramp's first and newest sample."""
+    _ramp_t: list[float] = field(default_factory=lambda: [-1.0, 0.0])
+    """Test time of the ramp's first and newest sample (first is -1 before one)."""
     closed: bool = False
     close_reason: str = ""
 
@@ -140,10 +147,13 @@ class TestRecord:
             col.append(raw.get(idx))            # and one missing from a line is a gap
 
     def fit_ramp(self, t: float, position_mm: float | None, force_kn: float | None) -> None:
-        """Add one ramp sample to the speed fits."""
-        if self._fit[0] == 0 and self._fit_force[0] == 0:
+        """Add one ramp sample to the rate fits, once the ramp has settled
+        (:data:`RAMP_SETTLE_S`)."""
+        if self._ramp_t[0] < 0:
             self._ramp_t[0] = t
         self._ramp_t[1] = t
+        if t - self._ramp_t[0] < RAMP_SETTLE_S:
+            return
         for s, x in ((self._fit, position_mm), (self._fit_force, force_kn)):
             if x is None:
                 continue
@@ -155,14 +165,15 @@ class TestRecord:
 
     @property
     def ramp_seconds(self) -> float:
-        """How long the ramp has been measured over, in seconds."""
-        return self._ramp_t[1] - self._ramp_t[0]
+        """How long the ramp has run, in seconds (its first
+        :data:`RAMP_SETTLE_S` are not in the measured rate)."""
+        return max(0.0, self._ramp_t[1] - self._ramp_t[0]) if self._ramp_t[0] >= 0 else 0.0
 
     @property
     def ramp_mm_min(self) -> float | None:
         """The speed the ramp has really run at so far: the slope of position
-        against time, least squares over every ramp sample, in mm/min. ``None``
-        before there are two samples to fit."""
+        against time, least squares over every ramp sample after the settling,
+        in mm/min. ``None`` before there are two samples to fit."""
         slope = _slope(self._fit)
         return None if slope is None else slope * 60.0
 
@@ -268,7 +279,8 @@ class Monitor:
         """
         if test is None:
             return None
-        loading = {Phase.AT_START_LOAD.value, Phase.RAMP.value, Phase.HELD.value}
+        loading = {Phase.AT_START_LOAD.value, Phase.RAMP.value, Phase.RAMP_END.value,
+                   Phase.HELD.value}
         return next((i for i, ph in enumerate(test.phase) if ph in loading), None)
 
     def force_displacement(self, test: TestRecord | None) -> ForceDisplacement:
@@ -378,8 +390,9 @@ class Monitor:
         return None if index is None or index not in raw else self.value(index, raw[index])
 
     def _judge_ramp(self, test: TestRecord) -> list[Notice]:
-        """Once, after :data:`RAMP_JUDGE_AFTER_S` of ramp: say so if the press is
-        not loading at the speed that was set.
+        """Once, after :data:`RAMP_JUDGE_AFTER_S` of ramp (its first
+        :data:`RAMP_SETTLE_S` left out of the fit): say so if the press is not
+        loading at the rate that was set.
 
         Path and force ramps are judged, each against its own channel: position
         in mm/min, force in kN/s. A ramp on a channel whose units are not
@@ -397,8 +410,8 @@ class Monitor:
             return []
         unit = self.press.channel(test.ramp.channel).unit
         text = (f"The ramp is running at {rate_text(measured, unit)}, not the "
-                f"{rate_text(wanted, unit)} set (measured over its first "
-                f"{test.ramp_seconds:.0f} s).")
+                f"{rate_text(wanted, unit)} set (measured from {RAMP_SETTLE_S:.0f} to "
+                f"{test.ramp_seconds:.0f} s into it).")
         test.warnings.append(text)
         return [Notice(text, warn=True)]
 
@@ -443,6 +456,9 @@ class Monitor:
             case Command(1):
                 self._ensure_test(ev)
                 self.phase = Phase.AT_START_LOAD
+            case Command(2):
+                if self.current is not None:
+                    self.phase = Phase.RAMP_END
             case Command(28):
                 return [Notice("Keypad STOP pressed on the controller. In PC mode the "
                                "controller does not act on it; it tells Proteus (#B28).")]

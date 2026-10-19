@@ -239,7 +239,18 @@ survived). Everything up to CONTINUE was the path test's sequence (`#B47` … `#
 load, `#D0520`), then `#D125000;0;300000;0;0`, `#B35`, `#B22`, `#O`. Force rose at **5.03 kN/s**
 (least squares over 47 s) while the piston moved at about 4.7 mm/min. So the ramp command is the same
 for both modes: the last field selects the channel, and the numbers are in thousandths of its unit.
-Not yet seen: what the controller does on reaching the end force by itself.
+
+
+**Step 21 — a force ramp left to reach its end** (`captures/20261019_165004_step21_force_2kN_s_to_end.jsonl`,
+template Force **2 kN/s, End 100 kN**, the same cube; it survived). Ramp `#D122000;0;100000;0;0` — the
+second force rate confirms the unit (2000 = 2 kN/s, measured 2.01 kN/s). At **99.67 kN** the
+controller sent **`#B02` — ramp end reached** (new, controller-initiated); **10 ms later Proteus sent
+`#B26`** (new; ends the test, as the template's "The test is successful" / "End test" steps suggest)
+and **`#B17`** (Cancel), and the load was released (98 → 2 kN within 3 s). The operator pressed
+nothing: **a force test ends by itself at its end force**, with Proteus driving the end.
+
+At a ramp's start the servo takes up the load: force dipped 11.8 → 10.9 kN, then jumped to 19.4 kN,
+before rising at 2 kN/s. The monitor leaves a ramp's first 3 s out of its measured rate.
 
 Conclusion for now: the start field does not set the speed (steps 17, 18, 19), and 10 mm/min is
 within the press's reach (at low load). **Step 15's 2.06 mm/min remains unexplained.** The monitor measures every
@@ -285,6 +296,29 @@ Operator procedure after a test: exit the test in Proteus, then press **STOP on 
   Proteus showed 0.0. → **Zero is a software tare inside Proteus.** A replacement app must do its own
   tare (subtract the raw value at the moment of zeroing).
 
+## Command summary
+
+| Code | From | Meaning | Status |
+|---|---|---|---|
+| `#B01` | CTRL | start load reached | confirmed |
+| `#B02` | CTRL | ramp end reached (force ramp at its end force) | confirmed (step 21) |
+| `#B28` | CTRL | keypad STOP pressed (in PC mode, not obeyed locally) | confirmed |
+| `#B35` | CTRL | answer to the ramp definition | hypothesis |
+| `#B43` | CTRL | test over, load released | hypothesis |
+| `#B17` | PC | Cancel: pump off, test ends | confirmed |
+| `#B18` | PC | Stop: piston held | confirmed |
+| `#B20` / `#B21` | PC | PC mode on / off | hypothesis |
+| `#B22` | PC | start the ramp | confirmed |
+| `#B23` | PC | start the approach | confirmed |
+| `#B26` | PC | test finished, sent in answer to `#B02` | hypothesis (step 21) |
+| `#B30` / `#B31` | PC | peak detection off / on | confirmed (display PK) |
+| `#B32` / `#B33` | PC | break detection off / on | confirmed (display BD) |
+| `#B36` / `#B37` | PC | stream off / on | confirmed |
+| `#B47` | PC | START pressed (arm the test) | hypothesis |
+| `#D05<n>` | PC | stream interval n × 10 ms | confirmed |
+| `#D12…` | PC | ramp: speed; start; end; 0; channel, in thousandths of the channel unit | confirmed for Path and Force |
+| `#B03 #B09 #B40 #B41 #B50–52 #D020 #D0910` | PC | start-up / approach, replayed as recorded | unknown, accepted |
+
 ## Controller display indicators
 
 The DigiMaxx LCD has a status row at the top and bottom. After a controller power-cycle (defaults):
@@ -316,7 +350,6 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 
 - Which start-up command makes **PC** / **FO** appear on the controller display.
 - Meaning of display indicators ZB, (bottom) FO, LD.
-- What each start-up command means (`#B20/21`, `#B40/41`, `#B50/51/52`, `#B03`, `#B09`, `#D020`, `#D0510`).
 - What Proteus puts in the ramp's start field (0×, 1×, 2×, 0×, 0× the piston position in steps 15–19); it does not affect the speed (steps 17–19).
 - Why step 15's 10 mm/min ramp ran at 2.06 mm/min; step 19 ran 10 mm/min correctly (at 7–9 kN).
 - Ramp field 4 (`0`) and whether field 5 changes with Force/Deformation control.
