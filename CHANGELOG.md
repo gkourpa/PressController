@@ -12,8 +12,8 @@ What each version added or changed, newest first.
   peak force; a force–displacement plot of the newest test; and a log of
   every command and event heard, with its meaning.
 - The ramp's real speed, measured from the path while it runs, beside the speed
-  that was set; a warning when the two differ by more than 20 %, and when
-  Proteus sends a ramp whose start is not where the piston is.
+  that was set, and a warning when the two differ by more than 20 %. The start
+  position the ramp was sent with is shown beside the piston's, as a note.
 - Every byte heard is kept as a capture, and every test as a CSV with raw counts
   beside the values.
 - `--replay` plays a recorded capture instead of listening.

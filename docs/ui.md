@@ -40,9 +40,9 @@ becomes a global setting as DAqReader's `refresh_hz` is.
   stands, so it is not blank while the piston moves.
 - **Log**: every non-measurement line heard, both directions, with its meaning;
   a guess ends in `?`, and a line not in the protocol notes is marked `!!`.
-- **Message island**: what needs saying now — a ramp whose start is not where
-  the piston is, a ramp running more than 20 % off its set speed, the keypad
-  STOP being pressed, an unknown line, a test saved, a port lost.
+- **Message island**: what needs saying now — a ramp running more than 20 % off
+  its set speed, the keypad STOP being pressed, an unknown line, a test saved, a
+  port lost.
 
 ## The ramp's speed is measured, not predicted
 
@@ -53,6 +53,12 @@ a difference over 20 % is said out loud. It used to be *predicted* from the
 ramp's start field, a model that fitted one test and was contradicted by the
 next ([protocol notes](PROTOCOL.md)); a measurement is right whatever the
 explanation turns out to be.
+
+The **start position** the ramp was sent with is shown beside where the piston
+really was, as a **plain note, not a warning** (operator, 2026-10-19). Proteus
+sends odd starts — 0, 1 and 2 times the piston position — and ramps with a wrong
+start ran at their set speed, so warning on every one alarmed the operator about
+nothing and would have taught them to ignore the one warning that matters.
 
 ## Saving
 

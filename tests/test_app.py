@@ -116,3 +116,21 @@ def test_the_screen_is_redrawn_at_no_more_than_its_ceiling(qapp, press, monkeypa
         assert shown[-1] == win.monitor.latest_t
     finally:
         win.close()
+
+
+def test_the_start_sent_is_a_plain_note_on_the_ramp_line(qapp, press):
+    """Step 17's start of twice the piston position: shown, in the normal colour."""
+    from presscontroller.app.main_window import MainWindow
+    from tests.conftest import RAMP_3
+    src = ReplayTap(RAMP_3, speed=1e9)
+    win = MainWindow(Monitor(press), src)
+    win.start()
+    win._timer.stop()
+    try:
+        win.tick()
+        win._display.flush()
+        text = win.ramp_lbl.text()
+        assert "start sent 159.202 mm, piston was at 79.600 mm" in text
+        assert "Warning" not in text and win.ramp_lbl.styleSheet() == ""
+    finally:
+        win.close()

@@ -50,11 +50,6 @@ from presscontroller.tap.events import TapEvent
 #: change of speed shows within it.
 RATE_WINDOW_S = 2.0
 
-#: How far the ramp's start may sit from where the piston is before the monitor
-#: says so. What the controller does with that start is not understood
-#: (docs/PROTOCOL.md, ramp command): one such ramp ran at a fifth of its speed.
-RAMP_START_TOLERANCE_MM = 0.5
-
 #: Seconds of ramp before its measured speed is judged. Its first seconds are the
 #: servo taking up the load — 5.4 mm/min for a moment in a 3 mm/min ramp — and
 #: ten seconds of a fit over the whole ramp so far settles well inside the
@@ -407,19 +402,19 @@ class Monitor:
         return []
 
     def _ramp(self, ev: TapEvent, ramp: Ramp) -> list[Notice]:
+        """Keep the ramp, and where the piston was when it was sent.
+
+        **The start it carries is noted, not warned about** (operator,
+        2026-10-19). Proteus has sent 0, 1 and 2 times the piston position, and
+        ramps with a start far from the piston ran at their set speed (steps 17
+        and 18): warning on every such ramp alarmed the operator about nothing
+        and taught them to ignore the colour. What the press really does is
+        measured instead, and :meth:`_judge_ramp` is the warning that matters.
+        """
         test = self._ensure_test(ev)
         test.ramp = ramp
-        here = self.latest_value(self.path_index)
-        test.ramp_from_mm = here
-        if here is None or self.path_index is None:
-            return []
-        if abs(ramp.start_um / 1000.0 - here) <= RAMP_START_TOLERANCE_MM:
-            return []
-        text = (f"Proteus sent the ramp's start as {ramp.start_um / 1000:.3f} mm with the "
-                f"piston at {here:.3f} mm. Such a ramp has run at a fifth of its speed "
-                f"before; its real speed is measured under Ramp.")
-        test.warnings.append(text)
-        return [Notice(text, warn=True)]
+        test.ramp_from_mm = self.latest_value(self.path_index)
+        return []
 
     def _ensure_test(self, ev: TapEvent) -> TestRecord:
         """The open test, or one opened now for a test already running when the

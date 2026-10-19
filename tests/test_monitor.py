@@ -43,10 +43,9 @@ def test_a_slow_ramp_is_measured_and_said_out_loud(press):
     assert test.ramp == Ramp(167, 0, 100000, 0, 1)
     assert test.ramp_from_mm == pytest.approx(79.45, abs=0.01)
     assert test.ramp_mm_min == pytest.approx(2.06, abs=0.01)
-    start, speed = test.warnings
-    assert "start as 0.000 mm with the piston at 79.451 mm" in start
+    [speed] = test.warnings
     assert speed.startswith("The ramp is running at 2.") and "not the 10 mm/min set" in speed
-    assert [n.text for n in notices if n.warn] == [start, speed]
+    assert [n.text for n in notices if n.warn] == [speed]
 
 
 def test_the_measured_speed_is_the_slope_of_path_against_time(press):
@@ -59,14 +58,15 @@ def test_the_measured_speed_is_the_slope_of_path_against_time(press):
     assert test.ramp_seconds == pytest.approx(t1 - t0)
 
 
-def test_a_start_off_the_piston_is_said_even_when_the_speed_is_right(press):
+def test_a_start_off_the_piston_is_kept_but_not_warned_about(press):
     # Step 17: start sent as exactly twice the position; the press still ran at 3.
     m, notices = replay_all(press, RAMP_3)
     test = m.tests[0]
     assert test.ramp == Ramp(50, 159202, 100000, 0, 1)
     assert test.ramp.start_um / 1000 / test.ramp_from_mm == pytest.approx(2.0, abs=1e-4)
     assert test.ramp_mm_min == pytest.approx(3.0, abs=0.1)
-    assert len(test.warnings) == 1 and "159.202 mm" in test.warnings[0]
+    assert test.warnings == []
+    assert not any(n.warn for n in notices)
     assert m.peak(test)[0] == pytest.approx(409.46, abs=0.01)
 
 
