@@ -31,6 +31,11 @@ py -3.14 -m venv .venv
 .venv\Scripts\python tools\sniff.py --list
 .venv\Scripts\python tools\sniff.py --pc-port COM7 --ctrl-port COM6 --baud 9600 --lines
 
+# Proteus' installation CD (data/proteus_cd, git-ignored), read as data, never run:
+# unpack the installer archive, then list the commands proteus.exe sends
+.venv\Scripts\python tools\proteus_cd.py unpack data\proteus_cd out\proteus_cd
+.venv\Scripts\python tools\proteus_cd.py commands out\proteus_cd\_root\proteus.exe
+
 # Regenerate the tap's wiring PDF (needs reportlab)
 .venv\Scripts\python docs\make_wiring_pdf.py
 ```

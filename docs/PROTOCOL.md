@@ -306,6 +306,9 @@ Operator procedure after a test: exit the test in Proteus, then press **STOP on 
 - Before that, the piston sat at 17.57 mm (had sunk from 19.39 mm since the Cancel).
 - Controller STOP pressed **after** Proteus closed: **nothing on the line** — sinking is purely local.
   In PC mode the keypad STOP is forwarded as `#B28` instead (see real test, 2026-10-19).
+- **Proteus has no command that lowers the piston**: none in its manuals, none on its test screen,
+  none in the program (see [From Proteus' own program](#from-proteus-own-program-installation-cd)).
+  Sinking is the keypad's alone: leave PC mode (`#B36` `#B21`), then STOP.
 
 ### Actions that send nothing
 
@@ -314,6 +317,64 @@ Operator procedure after a test: exit the test in Proteus, then press **STOP on 
   raw stream continued unchanged (force −6.3 kN, no jump); controller display unchanged while
   Proteus showed 0.0. → **Zero is a software tare inside Proteus.** A replacement app must do its own
   tare (subtract the raw value at the moment of zeroing).
+
+## From Proteus' own program (installation CD)
+
+The operator found Proteus' installation CD (Proteus 2.4.5, Wüst, 2003) on 2026-10-19; its contents
+are in `data/proteus_cd/` (git-ignored: proprietary). Nothing on it is run.
+`tools/proteus_cd.py unpack` reads the installer archive as data, and `tools/proteus_cd.py commands`
+lists the commands `proteus.exe` sends. What the program says is **evidence of what Proteus can send,
+not of what the controller does**: a code learnt only from here stays unconfirmed until it is seen on
+the line and the press's behaviour shows its meaning.
+
+**How it sends.** `proteus.exe` is a Delphi program. Its classes are `TServoAbstract` → `TDigimess`
+(another controller model), `TDigimaxx`, `TDigimaxxSynchro` (two machines run together). Every
+command leaves through one of two methods, which build `#B` + code or `#D` + value. The codes are
+fixed strings in the program, so the full list of `#B` codes it can ever send is known:
+
+| Code | Where the program sends it | Seen on our line |
+| --- | --- | --- |
+| `#B21` `#B20` | connecting, in that order | yes, start-up |
+| `#B04` | connecting, after `#B21 #B20`, **only for the Digimess** model | no (correctly) |
+| `#B40` `#B50` `#B51` `#B52` | connecting / machine set-up | yes, start-up |
+| `#B41`, then per channel `#B03` / `#B09` / `#B11` | connecting: one of the three per channel, chosen by a channel setting | `#B41 #B03 #B09` (two channels qualify); `#B11` never |
+| `#B37` / `#B36` | stream on / off | yes |
+| `#B30` / `#B31` | the Peak button (`SBPeakClick`) | yes |
+| `#B32` / `#B33` | the BR button (`SBBruchClick`) | yes |
+| `#B47` | the START button (`SBPruefenClick`) | yes |
+| `#B23` | starting the approach | yes |
+| `#B22` | starting the ramp | yes |
+| `#B18` | Stop / Continue (`SBStopWeiterClick`) | yes |
+| `#B17` | Cancel and every way back to idle (internal state "Messen") | yes |
+| `#B26` | after the ramp end | yes |
+| `#B38` | puts Proteus in its state "ramp halted"; reached from Cancel during a ramp under a condition not identified (every recorded Cancel sent `#B17`) | **no** |
+| `#B24` | machine switching ("Maschinenumschaltung", after a configurable wait); a multi-machine feature | **no** |
+| `#D160` / `#D161` | the same routine as `#B24`, when it does not send `#B24` | **no** |
+| `#B34` | an internal routine, purpose unknown | **no** |
+| `#B60` | an internal routine, purpose unknown | **no** |
+
+`#D` commands with run-time values are built elsewhere: `#D02<machine>` (we see `#D020`), `#D05<n>`
+(stream interval), the ramp `#D12…`, and others never seen (`#D06…`, `#D11…;0`/`;1`, `#D19…`,
+`#D21…` with a one-decimal value).
+
+**The test screen's buttons** (published handlers): `SBPruefenClick` (START), `SBAbbruchClick`
+(Cancel), `SBStopWeiterClick` (Stop / Continue — one handler, consistent with `#B18` toggling),
+`SBPeakClick`, `SBBruchClick`, `SBEndeClick` (Exit), `SBNaechstesElementClick` and two
+unnamed SpeedButtons (one acts only in a simulation mode).
+
+**"Next" is "Nächstes Element"** — next element of the test sequence. It acts only while a ramp or a
+hold time runs, and ends that element so the sequence goes on to the next. It does not lower the
+piston, and with our templates (one ramp) there is no element after the ramp.
+
+**Proteus' internal states** (`ss…`, in order): OffLine, OnLine, Messen (measuring, idle), Einrichten
+(setting up), Anfahren (approach), Angefahren (approached), Entlasten (unloading), Rampe,
+RampeAngehalten (ramp halted), Haltezeit (hold time), Starten, RampenEnde (ramp end), Error, Bruch
+(break), SoftwareBruch (software-detected break), MaschineZustandAbfragen (asking the machine's
+state). They match the phases decoded from the line.
+
+**The manuals** (`Handbuch proteus GR.pdf` is the German original; the English one is a poor machine
+translation) describe the same buttons, START → approach → "Weiterfahren" (continue) → load, and
+nothing that lowers the piston.
 
 ## Command summary
 
@@ -333,7 +394,8 @@ Operator procedure after a test: exit the test in Proteus, then press **STOP on 
 | `#B30` / `#B31` | PC | peak detection off / on | confirmed (display PK) |
 | `#B32` / `#B33` | PC | break detection off / on | confirmed (display BD) |
 | `#B36` / `#B37` | PC | stream off / on | confirmed |
-| `#B47` | PC | START pressed (arm the test) | hypothesis |
+| `#B47` | PC | START pressed (arm the test) | confirmed (Proteus' START handler sends it; the approach follows) |
+| `#B24` `#B34` `#B38` `#B60` `#D160` `#D161` | PC | in Proteus' program, never seen on the line (see above) | unknown — never to be sent |
 | `#D05<n>` | PC | stream interval n × 10 ms | confirmed |
 | `#D12…` | PC | ramp: speed; start; end; 0; channel, in thousandths of the channel unit | confirmed for Path and Force |
 | `#B03 #B09 #B40 #B41 #B50–52 #D020 #D0910` | PC | start-up / approach, replayed as recorded | unknown, accepted |
@@ -374,6 +436,7 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 - Ramp field 4 (`0`) and whether field 5 changes with Force/Deformation control.
 - Whether break detection (`#B33`) is ever enabled by a template, and what the controller sends on break.
 - Whether other keypad keys (START, ZERO, PEAK…) are forwarded like STOP (`#B28`) in PC mode.
-- Meaning of `#B47`, `#D0910`, controller `#B35`, `#B43`; what the `8` after `#D0` is.
+- Meaning of `#D0910`, controller `#B35`, `#B43`; what the `8` after `#D0` is.
+- What `#B34`, `#B38` and `#B60` do (in Proteus' program, never seen on the line).
 - What Peak and BR change inside the controller (stream looks the same).
 - Whether channel 3 (External, 250 kN) appears when active.
