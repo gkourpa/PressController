@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect x="0" y="0" width="512" height="512" rx="96" fill="#161B22"/>
+
+  <!-- the frame: crosshead, two columns, base -->
+  <path d="M112 432 V96 H400 V432" fill="none" stroke="#2DD4BF" stroke-width="18"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M84 432 H428" stroke="#2DD4BF" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="112" cy="96" r="11" fill="#5EEAD4"/>
+  <circle cx="400" cy="96" r="11" fill="#5EEAD4"/>
+
+  <!-- upper platen, hanging from the crosshead -->
+  <rect x="238" y="96" width="36" height="44" fill="#C9D1D9"/>
+  <rect x="160" y="132" width="192" height="30" rx="8" fill="#C9D1D9"/>
+
+  <!-- the cube, cracked -->
+  <rect x="190" y="174" width="132" height="132" rx="10" fill="#F2A93B"/>
+  <path d="M244 174 L230 214 L262 246 L246 278 L268 306" fill="none" stroke="#161B22"
+        stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- lower platen on the piston -->
+  <rect x="160" y="318" width="192" height="30" rx="8" fill="#C9D1D9"/>
+  <rect x="222" y="348" width="68" height="84" fill="#C9D1D9"/>
+</svg>

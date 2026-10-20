@@ -357,3 +357,10 @@ def test_the_plot_takes_its_settings(qapp, press):
         assert win.message.lines == 1
     finally:
         win.close()
+
+
+def test_the_app_has_its_icon(qapp):
+    from presscontroller.app.resources import ICON_ICO, ICON_SVG, app_icon
+    assert ICON_ICO.is_file() and ICON_SVG.is_file()
+    icon = app_icon()
+    assert not icon.isNull() and {16, 32, 256} <= {s.width() for s in icon.availableSizes()}

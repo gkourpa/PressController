@@ -62,6 +62,12 @@ From DAqReader (`..\DAqReader`), as it stood on 2026-10-19:
 - `app/widgets.py`, without DAqReader's `PlotPanel`.
 - `app/plot.py`'s `StickyMargins` and drawing helpers; the renderer is this
   application's own.
+- 2026-10-20: `config/parse.py`'s `get_range`; the settings dialog's
+  `AxisRange` (from DAqReader's plot dialog); `app/resources/` — `__init__.py`
+  and `generate_icon.py` unchanged but for the package name. The icon itself
+  (`icon.svg`, a press frame, platens and a cracked cube) is this application's,
+  drawn in the siblings' palette: #161B22 ground, teal #2DD4BF lines, amber
+  #F2A93B subject, grey #C9D1D9 solids.
 
 These are copies, not a shared package: a fix in one is not automatically a fix
 in the other.

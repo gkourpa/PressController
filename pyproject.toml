@@ -18,6 +18,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest"]
 docs = ["reportlab"]   # only to regenerate docs/RS232_Tap_Wiring.pdf
+icon = ["pillow"]      # only to regenerate presscontroller/app/resources/icon.ico
 
 [tool.setuptools.dynamic]
 version = {attr = "presscontroller.__version__"}
@@ -26,6 +27,11 @@ version = {attr = "presscontroller.__version__"}
 # not the application's.
 [tool.setuptools.packages.find]
 include = ["presscontroller*"]
+
+# The icon is package data: without this a non-editable install drops it, and
+# QIcon on a missing file is silently null (DAqReader's lesson).
+[tool.setuptools.package-data]
+"presscontroller.app.resources" = ["icon.ico", "icon.svg"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

@@ -36,6 +36,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from presscontroller.app.identity import DISPLAY_NAME, set_app_user_model_id
+from presscontroller.app.resources import app_icon
 from presscontroller.app.main_window import MainWindow
 from presscontroller.app.theme import apply_theme, follow_color_scheme
 from presscontroller.config.parse import ConfigError
@@ -90,6 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     set_app_user_model_id()
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName(DISPLAY_NAME)
+    app.setWindowIcon(app_icon())
     follow_color_scheme(app)
 
     settings, problem = load_settings()
