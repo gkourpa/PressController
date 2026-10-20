@@ -98,8 +98,10 @@ Anything else is refused before a byte is written.
 - With break detection on, **the controller reports a break as `#B27`**
   (confirmed at a cube's failure, step 32) — and then **holds the load**: Cancel
   stops the pump but does not release it. The keypad STOP releases it once PC
-  mode is off. So on `#B27` the session sends `#B17`, hands the keypad back
-  (`#B36 #B21`), and tells the operator, in red, to press STOP on the keypad.
+  mode is off. On `#B27` the session sends `#B17` and **stays connected**; the
+  message, in red, says to press STOP (a second Cancel — whether it releases the
+  load is the next cube's question, operator 2026-10-20) and, if the load does
+  not come off, Disconnect and the keypad STOP.
   Any other controller line no recording explains is answered with STOP.
 
 ## When something goes wrong — every case ends in `#B17`
@@ -138,6 +140,9 @@ Steps 1–4 done on 2026-10-20 (steps 27–31 in docs/PROTOCOL.md).
 5. **A cube to failure, break detection ON**: done (step 32) — peak 1908.9 kN,
    `#B27` at the break; the load stayed held after Cancel until PC mode was off
    and the keypad STOP pressed. Handled since as above.
+6. **The next cube, break detection ON**: at the break, press STOP in the
+   program — does a second Cancel release the load? If not within a few seconds,
+   Disconnect, then the keypad STOP.
 
 Each step is recorded and checked against Proteus' recording of the same thing
 before the next.

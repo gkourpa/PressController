@@ -55,10 +55,11 @@ off and PC mode off, as Proteus does when it exits.
   can go wrong: an answer that does not come, a controller line no recording
   explains (it may be how the controller tells a break), the readings stopping,
   Disconnect or closing during a test. The keypad STOP is answered as before.
-* **A break** (``#B27``, break detection on): the controller then holds the
-  load, and Cancel does not release it (step 32). The session sends Cancel,
-  hands the keypad back, and tells the operator to press the keypad STOP — what
-  released the load at the press.
+* **A break** (``#B27``, break detection on): the controller then held the
+  load, and one Cancel did not release it (step 32); PC mode off and the keypad
+  STOP did. The session sends Cancel and stays connected, so the operator can
+  try STOP — a second Cancel — and, failing that, Disconnect and the keypad
+  STOP. The message says both.
 """
 
 from __future__ import annotations
@@ -344,16 +345,17 @@ class ControllerSession:
                           "STOP (or Esc) stops the pump.")
             return
         if isinstance(msg, Command) and msg.code == 27:
-            # Step 32: after a break the controller holds the load; Cancel
-            # stops the pump but does not release it. The keypad STOP did, once
-            # PC mode was off — so: Cancel, hand the keypad back, and say so.
+            # Step 32: after a break the controller held the load; one Cancel
+            # stopped the pump but did not release it; the keypad STOP did,
+            # once PC mode was off. Whether a second Cancel releases it is the
+            # next cube's question (operator, 2026-10-20), so the session stays
+            # connected and STOP stays available.
             self.link.send(cmd.CANCEL)
-            self._send_all(cmd.DISCONNECT)
             self._end_test()
-            self.state = SessionState.IDLE
-            self._say("The controller reported a break (#B27): pump off, and the keypad is in "
-                      "charge again. The load may still be held — press STOP on the "
-                      "controller's keypad to release it.", "error")
+            self._say("The controller reported a break (#B27): pump off. The load may still be "
+                      "held — press STOP to release it. If it does not come off within a few "
+                      "seconds, press Disconnect, then STOP on the controller's keypad.",
+                      "error")
             return
         if not isinstance(msg, Command) or msg.code not in EXPLAINED_EVENTS:
             self._stop_for(f"the controller said {ev.text!r}, which no recording explains "

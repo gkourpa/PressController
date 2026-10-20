@@ -339,10 +339,10 @@ def test_the_load_released_after_stop_is_not_mistaken_for_trouble(limits):
         s.close()
 
 
-def test_a_break_hands_the_keypad_back_so_its_stop_can_release_the_load(limits):
+def test_a_break_is_cancelled_and_stop_stays_available(limits):
     # Step 32: at a cube's failure (1909 kN) the controller sent #B27; Cancel
     # stopped the pump but the load stayed (~1528 kN) until PC mode was off and
-    # the keypad STOP was pressed.
+    # the keypad STOP was pressed. Next: does a second Cancel (STOP) release it?
     fake = FakeController()
     s = _connected(fake, limits, break_detection=True)
     try:
@@ -352,11 +352,13 @@ def test_a_break_hands_the_keypad_back_so_its_stop_can_release_the_load(limits):
         _run(s, lambda s: s.test is RunPhase.RAMP)
         n = len(fake.written)
         fake.say("#B27")
-        _run(s, lambda s: s.state is SessionState.IDLE)
-        assert fake.written[n:] == ["#B17", "#B36", "#B21"]
-        assert s.test is RunPhase.NONE and not fake.pc_mode
+        _run(s, lambda s: s.test is RunPhase.NONE)
+        assert fake.written[n:] == ["#B17"]
+        assert s.state is SessionState.CONNECTED and fake.pc_mode
         msg = s.pop_messages()[-1]
-        assert msg.level == "error" and "press STOP on the controller's keypad" in msg.text
+        assert msg.level == "error" and "press STOP to release it" in msg.text
+        assert "Disconnect, then STOP on the controller's keypad" in msg.text
+        assert s.stop() and fake.written[n:] == ["#B17", "#B17"]
     finally:
         s.close()
 

@@ -385,8 +385,8 @@ Proteus' program does not send anything itself on a break: its handler records t
 its test window "sample broken". Its manual says the machine unloads by itself at a break — not
 what happened here; whether the immediate `#B17` stopped an unloading the controller had begun is
 not known. What is known to release the load after a break: PC mode off, then the keypad STOP.
-Control mode now does the first part by itself on `#B27` and tells the operator to press the keypad
-STOP.
+Whether a second `#B17` would release it is untested; on `#B27` control mode now sends `#B17` and
+stays connected, so the next cube can try STOP in the program, then Disconnect and the keypad STOP.
 
 ### Ramp end and keypad STOP from control mode, 2026-10-20, `captures/20261020_110938_step31_force_ramp_end_and_keypad_stop.jsonl`
 
