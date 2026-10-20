@@ -371,6 +371,33 @@ Proteus' path ramps under load, for comparison: 10 mm/min ran at 2.23 (step 15, 
 3 at 2.33 (step 17), 2 at 2.09 (23), 1 at 1.11 (18); step 19 ran 10 at 9.77 on a specimen that hardly
 loaded. Whether the press also has a ceiling near 2.3 mm/min under load (step 17) is open.
 
+### Ramp end and keypad STOP from control mode, 2026-10-20, `captures/20261020_110938_step31_force_ramp_end_and_keypad_stop.jsonl`
+
+Control mode, Force 2 kN/s to 100 kN, break detection on, a specimen at 67.1 mm.
+
+- **Ramp end**: CONTINUE → `#D0520` `#D122000;0;100000;0;0` `#B35` `#B22` `#O`; force rose at 2.08 kN/s;
+  the controller's `#B02` at **99.87 kN**, answered `#B26` `#B17` 20 ms later, as Proteus (step 21);
+  `#B27` 0.5 s later as the load fell (third time, again only with break detection on); `#B43` 20 s
+  later.
+- **Keypad STOP during the ramp**: `#B28` at 52 kN → `#B17` `#B36` `#B21` 50 ms later; pump off,
+  keypad in charge (operator).
+- **New: the controller's own report.** ~2 s after PC mode went off, mid-test, the controller sent
+  seven text lines on the serial line — what looks like its local-mode printout:
+
+  ```
+        DATE            00.00.00
+        IDENT                  1
+        ORDER                  0
+        TESTER                 0
+        AGE               0 Days
+        BREAK            44.9 kN
+        DEFORM        + 67.39 mm
+  ```
+
+  Never seen before: Proteus only ever left PC mode with no test running. BREAK 44.9 kN and DEFORM
+  67.39 mm are near the force after the STOP and the piston's position; what exactly the controller
+  records is not known. Control mode, no longer connected, only logs them.
+
 ### Two program bugs, failing safe, 2026-10-20, `captures/20261020_110322_step30_split_reply_and_connect_race.jsonl`
 
 - **Connect aborted** after a correct start-up answer: `#B40` took 60 ms to write over USB, the
@@ -378,7 +405,9 @@ loaded. Whether the press also has a ceiling near 2.3 mm/min under load (step 17
   session's start-up check, which saw only `#D104000` and aborted. Fixed: every controller line passes
   the session's checks.
 - **START stopped at once**: the controller answered `#B47` with `#O` **CR, then a whole measurement
-  line, then `#O`'s LF** — `#O#D088002;…
+  line, then `#O`'s LF** — `#O
+#D088002;…
+
 
 `. Read as ending only at CR LF, that was one unknown
   line, and the session stopped the test (`#B17`) before the approach. **The controller can put a
@@ -471,7 +500,8 @@ validity question and "keep measuring" send nothing.
 |---|---|---|---|
 | `#B01` | CTRL | start load reached | confirmed |
 | `#B02` | CTRL | ramp end reached (force ramp at its end force) | confirmed (step 21) |
-| `#B27` | CTRL | break detected: with break detection on, the force fell by the threshold (10 ‰ of range = 40 kN) from its peak | hypothesis (steps 27, 29: only with break detection on, at a 40–41 kN drop) |
+| `#B27` | CTRL | break detected: with break detection on, the force fell by the threshold (10 ‰ of range = 40 kN) from its peak | hypothesis (steps 27, 29, 31: only with break detection on, after a load fell) |
+| text lines (`DATE`, `IDENT`, … `BREAK`, `DEFORM`) | CTRL | the controller's own test report, sent on leaving PC mode during a test | seen once (step 31) |
 | `#B28` | CTRL | keypad STOP pressed (in PC mode, not obeyed locally) | confirmed |
 | `#B35` | CTRL | answer to the ramp definition | hypothesis |
 | `#B43` | CTRL | test over, load released | hypothesis |

@@ -48,7 +48,9 @@ and undocumented, so the protocol is learnt from the live link first.
      simulated controller, line for line against steps 21, 23 and 26. **First run
      on the press 2026-10-20** (step 27): START, start load, CONTINUE, PAUSE,
      CONTINUE, STOP on a specimen, line for line as Proteus; the controller's
-     `#B27` (break detected?) seen for the first time. The remaining steps are in
+     `#B27` (break detected?) seen for the first time. Step 31: a force ramp
+     ending by itself (`#B02` answered `#B26 #B17`) and the keypad STOP during a
+     ramp (answered in 50 ms), both as planned. What remains is in
      [motion](motion.md#first-run-at-the-press--one-step-at-a-time-operators-hand-on-the-keypad-stop).
    - **Later**: Proteus' UNLOAD and Cycle start elements, each after its own
      recording (operator, 2026-10-20).

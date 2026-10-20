@@ -132,6 +132,8 @@ following our own test as it follows Proteus'.
 3. **A cube, Force 2 kN/s to 100 kN**: the ramp ends by itself; the program
    answers `#B02` with `#B26 #B17` (as step 21).
 4. **Keypad STOP** during a ramp → pump off, keypad in charge.
+Steps 1–4 done on 2026-10-20 (steps 27–31 in docs/PROTOCOL.md).
+
 5. **A cube to failure, break detection ON**: watch what the controller does
    and sends at the break; the operator ready on STOP.
 
