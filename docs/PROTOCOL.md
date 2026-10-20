@@ -371,6 +371,14 @@ Proteus' path ramps under load, for comparison: 10 mm/min ran at 2.23 (step 15, 
 3 at 2.33 (step 17), 2 at 2.09 (23), 1 at 1.11 (18); step 19 ran 10 at 9.77 on a specimen that hardly
 loaded. Whether the press also has a ceiling near 2.3 mm/min under load (step 17) is open.
 
+### After a break, a second Cancel releases the load, 2026-10-20, `captures/20261020_112855_step33_second_cancel_releases_after_break.jsonl`
+
+Control mode, break detection on (10 ‰), Path 2 mm/min, a cube that failed gradually: peak **533.8
+kN**, then `#B27` at **496 kN** (≈ 38 kN down); `#B17` 30 ms later (automatic); `#B43` at once; the
+pump stopped and **the load was held at ~450 kN**, as in step 32. 10 s later the operator pressed STOP
+— **a second `#B17` — and the load came off**: 448 → 218 kN in 0.4 s, under 5 kN in 2 s, the piston
+retracting. **After a break: the first Cancel stops the pump, the second releases the load.**
+
 ### A cube to failure with break detection on, 2026-10-20, `captures/20261020_111756_step32_cube_to_failure_break_detection_on.jsonl`
 
 Control mode, break detection on (10 ‰), Path 2 mm/min (ran at 2.07 mm/min, 12 kN/s), a fresh 150 mm
@@ -517,7 +525,7 @@ validity question and "keep measuring" send nothing.
 |---|---|---|---|
 | `#B01` | CTRL | start load reached | confirmed |
 | `#B02` | CTRL | ramp end reached (force ramp at its end force) | confirmed (step 21) |
-| `#B27` | CTRL | break detected (break detection on): the force fell by the threshold from its peak. After it the controller holds the load; Cancel stops the pump but does not release it — PC mode off and the keypad STOP do | confirmed at a cube's failure (step 32; also steps 27, 29, 31 after a STOP) |
+| `#B27` | CTRL | break detected (break detection on): the force fell by the threshold from its peak. After it the controller holds the load: the first Cancel stops the pump, a second Cancel releases the load (as do PC mode off and the keypad STOP) | confirmed at two cubes' failures (steps 32, 33; also steps 27, 29, 31 after a STOP) |
 | text lines (`DATE`, `IDENT`, … `BREAK`, `DEFORM`) | CTRL | the controller's own test report, sent on leaving PC mode during a test | seen once (step 31) |
 | `#B28` | CTRL | keypad STOP pressed (in PC mode, not obeyed locally) | confirmed |
 | `#B35` | CTRL | answer to the ramp definition | hypothesis |
@@ -575,7 +583,7 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 - Whether a path ramp under load is limited near 2.3 mm/min (step 17: 3 set, 2.33 measured).
 - What limits a path ramp under load to about 2.3 mm/min (steps 15, 17); step 19 ran 10 mm/min without load.
 - Ramp field 4 (`0`) and whether field 5 changes with Force/Deformation control.
-- After a break (`#B27`), whether the controller would unload by itself if not sent `#B17`, and what Proteus does — a Proteus recording with break identification on, to failure, would show both.
+- After a break (`#B27`), whether the controller would unload by itself if not sent `#B17`, how soon a second `#B17` may follow the first (10 s in step 33), and what Proteus does — a Proteus recording with break identification on, to failure, would show these.
 - Whether other keypad keys (START, ZERO, PEAK…) are forwarded like STOP (`#B28`) in PC mode.
 - Meaning of `#D0910`, controller `#B35`, `#B43`; what the `8` after `#D0` is.
 - What `#B34`, `#B38` and `#B60` do (in Proteus' program, never seen on the line).

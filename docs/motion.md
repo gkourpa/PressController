@@ -140,9 +140,8 @@ Steps 1–4 done on 2026-10-20 (steps 27–31 in docs/PROTOCOL.md).
 5. **A cube to failure, break detection ON**: done (step 32) — peak 1908.9 kN,
    `#B27` at the break; the load stayed held after Cancel until PC mode was off
    and the keypad STOP pressed. Handled since as above.
-6. **The next cube, break detection ON**: at the break, press STOP in the
-   program — does a second Cancel release the load? If not within a few seconds,
-   Disconnect, then the keypad STOP.
+6. **The next cube, break detection ON**: done (step 33) — the program's STOP,
+   a second Cancel 10 s after the first, released the load at once.
 
 Each step is recorded and checked against Proteus' recording of the same thing
 before the next.
