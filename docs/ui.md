@@ -81,30 +81,39 @@ the window closes is saved too. A replay writes nothing on its own;
 ## The control window
 
 `python -m presscontroller.app --control`, with the old PC unplugged from the
-controller and the controller cable plugged into the press file's
-`[control] port`. Every launch asks that to be confirmed first. The window is the
-monitor's, with a bar on top:
+controller and the controller cable plugged into the settings' `control_port`.
+Every launch asks that to be confirmed first. The window is the monitor's, with
+two bars on top. The connection bar:
 
 - **Controller: …** — the session's state (not connected, checking the line is
   free, connecting, connected in PC mode, refused or aborted).
 - **Break detection** and **Peak** — on/off **switches** with the state in words
   (operator, 2026-10-19: "a switch, easy for everyone to understand"). The
   controller does not report either, so the program *sets* them to the switches'
-  positions as it connects and on every flip; a switch never shows a guess.
-  Break detection starts on, Peak off — the controller's power-up defaults. A
-  switch flipped while not connected is applied on connecting.
+  positions as it connects, at START and on every flip; a switch never shows a
+  guess. **They are obeyed, never reset** (operator, 2026-10-20): they open at
+  the saved settings (break detection on, Peak off by default) and a flip is
+  saved. A switch flipped while not connected is applied on connecting; during a
+  test they are locked.
 - **Connect** / **Disconnect**.
 
-This version has no control that moves the press. The test controls come with
-the motion milestone, named as the operator asked (2026-10-19):
+The test bar: the test's phase; the ramp — control (Path or Force), speed, end,
+and the press file's limit beside it (an edit is saved as the settings' ramp);
+and the buttons, named as the operator asked (2026-10-19):
 
 | Button | Sends | Notes |
 | --- | --- | --- |
-| **START** | `#B47`, `#B30`/`#B32`, `#D0910`, `#B23` | approach to the start load |
-| **CONTINUE** (after the start load) | `#D0520`, the ramp `#D12…`, `#B22` | the test itself |
+| **START** | `#B47`; on `#O`: Peak and break detection as the switches stand (`#B33` then the threshold `#D21…`), the start load `#D09…`, `#B23` | approach to the start load; off when the ramp is outside the limits, with the reason shown |
+| **CONTINUE** (after the start load) | the interval `#D05…`, the ramp `#D12…`; on `#B35`: `#B22` | the test itself |
 | **PAUSE** / **CONTINUE** (during the ramp) | `#B18` | one toggling command; freezes the ramp's target |
 | **STOP** | `#B17` | Proteus' "Cancel": pump off, load released. The real stop |
 
 **PAUSE is not a safety stop**: it freezes the ramp's target, so a piston that
-lags its target keeps going (step 22). STOP is Cancel. START will refuse a ramp
-above the press file's `[limits]`.
+lags its target keeps going (step 22). STOP is Cancel: red, on the **Esc** key,
+available whenever connected.
+
+**Settings…** (File menu, both windows, as DAqReader's): the screen's redraw
+ceiling, control mode's port, and the test — Proteus' template: Peak, break
+detection and its threshold, the start load, the ramp (Path and Force speed and
+end) and its measuring interval. Saved to the global settings file only on OK;
+locked during a test.

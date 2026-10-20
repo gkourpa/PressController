@@ -61,10 +61,10 @@ def _connected(fake):
     return s
 
 
-def test_no_motion_line_is_on_the_allowlist():
-    assert not ALLOWED & cmd.MOTION
-    for line in ["#B47", "#B23", "#B22", "#B18", "#B26", "#D0910", "#D0520",
-                 "#D12167;0;100000;0;1", "#D122000;0;100000;0;0", "#X", "", "#B17 "]:
+def test_the_allowlist_holds_only_lines_proteus_was_recorded_sending():
+    assert not ALLOWED & cmd.NEVER
+    for line in ["#B24", "#B38", "#B60", "#D160", "#X", "", "#B17 ",
+                 "#D12167;0;100000;0;1"]:      # a ramp, without the press file's limits
         with pytest.raises(NotAllowed):
             cmd.check(line)
 
@@ -74,7 +74,7 @@ def test_a_line_not_allowed_never_reaches_the_port():
     s = _session(fake)
     try:
         with pytest.raises(NotAllowed):
-            s.link.send("#B47")
+            s.link.send("#B38")
         assert fake.written == [] and s.link.sent == []
     finally:
         s.close()

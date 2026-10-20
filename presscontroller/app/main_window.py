@@ -46,9 +46,11 @@ from PySide6.QtWidgets import (
 )
 
 from presscontroller.app.identity import DISPLAY_NAME
+from presscontroller.app.settings_dialog import SettingsDialog
 from presscontroller.app.plot import render_force_displacement
 from presscontroller.app.theme import styled, text_style
 from presscontroller.app.widgets import Coalescer, Gauge, MessageIsland, PlotView, island
+from presscontroller.config.settings import Settings, save_settings
 from presscontroller.monitor import Monitor, write_test_csv
 from presscontroller.protocol import PC_TO_CTRL, rate_text
 
@@ -56,9 +58,8 @@ from presscontroller.protocol import PC_TO_CTRL, rate_text
 #: when they are polled, so this only sets how soon the window shows them.
 TICK_MS = 50
 
-#: The screen's redraw ceiling, in hertz — readings, status, plot and log
-#: alike. DAqReader's default for its ``refresh_hz``; it becomes a global
-#: setting the same way, and until then is the window's ``refresh_hz`` argument.
+#: The screen's redraw ceiling, in hertz, when no settings are given — the
+#: global setting ``refresh_hz`` otherwise, as in DAqReader.
 REFRESH_HZ = 2.0
 
 #: Width of the reading column. The gauges hold a five-figure force and its
@@ -75,8 +76,10 @@ def _template(rng: float, decimals: int, unit: str) -> str:
 
 class MainWindow(QMainWindow):
     def __init__(self, monitor: Monitor, source, *, tests_dir: Path | None = None,
-                 refresh_hz: float = REFRESH_HZ, parent=None):
+                 settings: Settings | None = None, save=save_settings, parent=None):
         super().__init__(parent)
+        self.settings = settings if settings is not None else Settings(refresh_hz=REFRESH_HZ)
+        self._save = save
         self.monitor = monitor
         self.source = source
         self.tests_dir = tests_dir
@@ -168,15 +171,19 @@ class MainWindow(QMainWindow):
         open_dir.setEnabled(tests_dir is not None)
         quit_ = QAction("Quit", self)
         quit_.triggered.connect(self.close)
+        self.settings_action = QAction("Settings…", self)
+        self.settings_action.triggered.connect(self.open_settings)
         menu = self.menuBar().addMenu("File")
         menu.addAction(save)
         menu.addAction(open_dir)
+        menu.addSeparator()
+        menu.addAction(self.settings_action)
         menu.addSeparator()
         menu.addAction(quit_)
 
         self._base_message = self.intro()
         self.say(self._base_message)
-        self._display = Coalescer(self._show, refresh_hz, self)
+        self._display = Coalescer(self._show, self.settings.refresh_hz, self)
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.tick)
         self.resize(1400, 860)
@@ -325,6 +332,18 @@ class MainWindow(QMainWindow):
             fd.displacement, fd.force, peak=fd.peak, displacement_label=x_lbl,
             force_label=f_lbl, units=(unit, force.unit if force else ""), title=title,
             size_px=size, dpi=dpi, margins=margins))
+
+    # ---- settings ----------------------------------------------------------
+
+    def open_settings(self) -> None:
+        dlg = SettingsDialog(self.settings, save=self._save, parent=self)
+        if dlg.exec():
+            self.apply_settings(dlg.settings)
+
+    def apply_settings(self, settings: Settings) -> None:
+        """Take new settings into use: here, the redraw rate."""
+        self.settings = settings
+        self._display.set_rate(settings.refresh_hz)
 
     # ---- saving ------------------------------------------------------------
 

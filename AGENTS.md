@@ -20,10 +20,14 @@ press.
 1. **Only allowlisted lines are ever sent to the controller.** The allowlist
    (`control/commands.py`) is checked at the one place a byte leaves
    (`ControllerLink.send`); the tap and the monitor window have no write path
-   and do not import `control`. **No motion command is on the list** until the
-   milestone that adds motion, with its own review. Every way out of PC mode —
-   disconnect, abort, keypad STOP, closing — ends with stream off and PC mode
-   off. The controller's own STOP and the press emergency stop remain the
+   and do not import `control`. The list holds exact lines Proteus was
+   recorded sending, and four lines built from settings, each accepted only
+   inside its range (the ramp within the press file's `[limits]`;
+   docs/motion.md). **A code seen only in Proteus' program, never on the line,
+   is never sent** (`commands.NEVER`). Every way out of a test — STOP, a missing
+   answer, an unexplained controller line, the readings stopping, disconnect,
+   closing — sends Cancel (`#B17`); every way out of PC mode ends with stream
+   off and PC mode off. The controller's own STOP and the press emergency stop remain the
    primary safety devices; **PAUSE (`#B18`) is not a stop**, Cancel (`#B17`) is.
 2. A protocol meaning is **confirmed** only when the controller's display or the
    press's behaviour showed it; anything inferred from timing is a hypothesis

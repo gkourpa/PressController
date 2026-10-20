@@ -1,4 +1,4 @@
-# Milestone 3b — motion (proposal, awaiting the operator's approval)
+# Milestone 3b — motion (built and tested against the simulated controller; not yet run on the press)
 
 The control window gets **START / PAUSE / CONTINUE / STOP**, and sends exactly
 what Proteus sends for the same buttons. What Proteus keeps in its test template
@@ -134,6 +134,15 @@ following our own test as it follows Proteus'.
 
 Each step is recorded and checked against Proteus' recording of the same thing
 before the next.
+
+## Later: more of Proteus' elements
+
+Proteus' template can hold more elements than the lab's: Break identification
+(PC), Cycle start, Holding time, UNLOAD, Limit, Wait, Digischmidt, ramp for
+calibration, relais, Data transfer. The operator chose **UNLOAD** and **Cycle
+start** to add later (2026-10-20), each after its own Proteus recording, as the
+break threshold was learnt (step 26). Nothing is sent for an element before a
+recording shows its lines.
 
 ## Not in this milestone
 

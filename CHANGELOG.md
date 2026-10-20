@@ -15,6 +15,16 @@ What each version added or changed, newest first.
 - The press file's `[limits]`: the fastest path and force ramps allowed. The
   monitor says so the moment a faster ramp is sent.
 
+- **Tests from control mode**: START, PAUSE, CONTINUE and STOP, sending what
+  Proteus sends, line for line. STOP (and Esc) is Cancel; every failure during a
+  test ends in Cancel. Ramps are refused above the press file's `[limits]`.
+- **Settings** (File → Settings…), saved in the settings file: the screen's
+  redraw rate, control mode's port, and Proteus' test template — Peak, break
+  detection and threshold, start load, the ramp and its measuring interval. The
+  Peak and Break detection switches are remembered, never reset.
+- `tools/proteus_cd.py`: reads Proteus' installation CD as data and lists the
+  commands it sends.
+
 ### Changed
 
 - PAUSE / CONTINUE (`#B18`) is understood as one toggling command; the measured

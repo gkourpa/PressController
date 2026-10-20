@@ -70,7 +70,8 @@ def test_the_window_has_no_control_that_sends(qapp, press):
     win = _window(qapp, press, until=1.0)
     try:
         names = [a.text() for a in win.menuBar().actions()[0].menu().actions() if a.text()]
-        assert names == ["Save newest test as CSV…", "Open the tests folder", "Quit"]
+        assert names == ["Save newest test as CSV…", "Open the tests folder", "Settings…",
+                         "Quit"]
         assert [b for b in win.findChildren(QAbstractButton)
                 if b.isVisible() and b.text()] == []
     finally:
@@ -100,7 +101,8 @@ def test_the_screen_is_redrawn_at_no_more_than_its_ceiling(qapp, press, monkeypa
     """Data is taken in every tick; the screen only at ``refresh_hz``."""
     from presscontroller.app.main_window import MainWindow
     src = ReplayTap(REAL_TEST, speed=1e9)
-    win = MainWindow(Monitor(press), src, refresh_hz=2.0)
+    from presscontroller.config.settings import Settings
+    win = MainWindow(Monitor(press), src, settings=Settings(refresh_hz=2.0))
     shown = []
     monkeypatch.setattr(win, "_show", lambda: shown.append(win.monitor.latest_t))
     win._display._fn = win._show
@@ -157,42 +159,144 @@ def test_a_force_ramp_on_the_ramp_line(qapp, press):
         win.close()
 
 
-def test_the_control_window_connects_switches_and_disconnects_on_close(qapp, press, monkeypatch):
-    import time
-
+def _control_window(qapp, press, monkeypatch, settings=None, fake=None):
     from presscontroller.app.control_window import ControlWindow
-    from presscontroller.control import ControllerLink, ControllerSession, SessionState
+    from presscontroller.config.settings import Settings
+    from presscontroller.control import ControllerLink, ControllerSession, Limits
     from presscontroller.control import session as session_mod
     from tests.controller_fake import FakeController
 
     monkeypatch.setattr(session_mod, "LISTEN_FIRST_S", 0.05)
-    fake = FakeController()
-    session = ControllerSession(ControllerLink("COM9", open_port=lambda name: fake))
-    win = ControlWindow(Monitor(press), session)
+    fake = fake or FakeController()
+    saved = []
+    session = ControllerSession(ControllerLink("COM9", limits=Limits.from_press(press),
+                                               open_port=lambda name: fake))
+    win = ControlWindow(Monitor(press), session, settings=settings or Settings(),
+                        save=saved.append)
     win.start()
     win._timer.stop()
+    return win, fake, saved
+
+
+def _tick_until(win, cond, timeout=3.0):
+    import time
+    end = time.monotonic() + timeout
+    while not cond() and time.monotonic() < end:
+        win.tick()
+        time.sleep(0.01)
+    win.tick()
+    assert cond()
+
+
+def test_the_control_window_connects_switches_and_disconnects_on_close(qapp, press, monkeypatch):
+    from presscontroller.control import SessionState
+    win, fake, saved = _control_window(qapp, press, monkeypatch)
+    session = win.session
     try:
-        assert "CONTROL (no motion)" in win.windowTitle()
+        assert "CONTROL" in win.windowTitle()
         assert win.connect_btn.isEnabled() and not win.disconnect_btn.isEnabled()
+        assert not win.start_btn.isEnabled() and not win.stop_btn.isEnabled()
         assert win.break_switch.isChecked() and not win.peak_switch.isChecked()
         assert win.break_switch.state_text() == "Break detection: ON"
         win.connect_btn.click()
-        end = time.monotonic() + 3.0
-        while session.state is not SessionState.CONNECTED and time.monotonic() < end:
-            win.tick()
-            time.sleep(0.01)
-        win.tick()
-        assert session.state is SessionState.CONNECTED
+        _tick_until(win, lambda: session.state is SessionState.CONNECTED)
         assert win.state_lbl.text() == "Controller: connected, in PC mode"
-        assert win.disconnect_btn.isEnabled()
-        assert not win.connect_btn.isEnabled()
+        assert win.disconnect_btn.isEnabled() and not win.connect_btn.isEnabled()
+        assert win.start_btn.isEnabled() and win.stop_btn.isEnabled()
         assert "Connected" in win.message.text()
         win.peak_switch.click()
         win.break_switch.click()
         assert fake.peak and not fake.break_detection
         assert win.break_switch.state_text() == "Break detection: OFF"
-        texts = sorted(b.text() for b in win.findChildren(QPushButton) if b.text())
-        assert texts == ["Connect", "Disconnect"]
+        # A flip is remembered, never reset.
+        assert saved[-1].test.peak and not saved[-1].test.break_detection
     finally:
         win.close()
     assert fake.written[-2:] == ["#B36", "#B21"] and not fake.pc_mode
+
+
+def test_the_switches_open_at_the_saved_settings(qapp, press, monkeypatch):
+    from presscontroller.config.settings import Settings, TemplateSettings
+    from presscontroller.control import SessionState
+    settings = Settings(test=TemplateSettings(peak=True, break_detection=False))
+    win, fake, _ = _control_window(qapp, press, monkeypatch, settings)
+    try:
+        assert win.peak_switch.isChecked() and not win.break_switch.isChecked()
+        win.connect_btn.click()
+        _tick_until(win, lambda: win.session.state is SessionState.CONNECTED)
+        assert fake.peak and not fake.break_detection
+    finally:
+        win.close()
+
+
+def test_a_test_run_from_the_buttons(qapp, press, monkeypatch):
+    from presscontroller.control import RunPhase, SessionState
+    win, fake, saved = _control_window(qapp, press, monkeypatch)
+    s = win.session
+    try:
+        win.connect_btn.click()
+        _tick_until(win, lambda: s.state is SessionState.CONNECTED)
+        assert win.limit_lbl.text() == "limit 10 mm/min"
+        win.start_btn.click()
+        _tick_until(win, lambda: s.test is RunPhase.AT_START_LOAD)
+        assert not win.start_btn.isEnabled() and win.continue_btn.isEnabled()
+        assert not win.peak_switch.isEnabled() and not win.speed_box.isEnabled()
+        win.continue_btn.click()
+        _tick_until(win, lambda: s.test is RunPhase.RAMP)
+        assert fake.ramp == "#D1233;0;100000;0;1"
+        assert win.run_lbl.text() == "Test: ramp running"
+        win._display.flush()
+        assert win.test_lbl.text().startswith("#1, START at")      # the monitor's own line
+        assert win.pause_btn.isEnabled() and not win.continue_btn.isEnabled()
+        win.pause_btn.click()
+        win.tick()
+        assert s.test is RunPhase.PAUSED and win.continue_btn.isEnabled()
+        assert "not a stop" in win.message.text()
+        win.continue_btn.click()
+        win.tick()
+        assert s.test is RunPhase.RAMP
+        win._esc.activated.emit()               # Esc is STOP
+        win.tick()
+        assert s.test is RunPhase.NONE and fake.written[-1] == "#B17"
+        assert win.start_btn.isEnabled()
+    finally:
+        win.close()
+
+
+def test_a_ramp_over_the_limit_turns_start_off_and_says_why(qapp, press, monkeypatch):
+    from presscontroller.control import SessionState
+    win, fake, saved = _control_window(qapp, press, monkeypatch)
+    try:
+        win.connect_btn.click()
+        _tick_until(win, lambda: win.session.state is SessionState.CONNECTED)
+        win.speed_box.setValue(120.0)           # step 22's mistake
+        assert not win.start_btn.isEnabled()
+        assert "START is off" in win.run_lbl.text() and "limits" in win.run_lbl.text()
+        assert saved[-1].test.path_speed_mm_min == 120.0      # remembered as entered
+        win.control_box.setCurrentIndex(win.control_box.findData("force"))
+        assert win.speed_box.suffix() == " kN/s" and win.limit_lbl.text() == "limit 15 kN/s"
+        assert win.start_btn.isEnabled()
+    finally:
+        win.close()
+
+
+def test_the_settings_dialog_saves_only_on_ok(qapp):
+    from presscontroller.app.settings_dialog import SettingsDialog
+    from presscontroller.config.settings import Settings
+    saved = []
+    dlg = SettingsDialog(Settings(control_port="COM7"), save=saved.append)
+    assert dlg.port.currentText() == "COM7"
+    dlg.threshold.setValue(25.0)
+    dlg.interval.setValue(205)
+    dlg.refresh.setValue(1.0)
+    dlg.reject()
+    assert saved == [] and dlg.settings.test.break_threshold_per_mil == 10.0
+    dlg = SettingsDialog(Settings(control_port="COM7"), save=saved.append)
+    dlg.threshold.setValue(25.0)
+    dlg.interval.setValue(205)
+    dlg.port.setCurrentText("COM6")
+    dlg._accept()
+    got = saved[-1]
+    assert got.test.break_threshold_per_mil == 25.0 and got.control_port == "COM6"
+    assert got.test.measuring_interval_ms in (200, 210)   # whole 10 ms steps
+    assert got.test.problems() == []

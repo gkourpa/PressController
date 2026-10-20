@@ -21,7 +21,7 @@ py -3.14 -m venv .venv
 # The monitor on the live tap
 .venv\Scripts\python -m presscontroller.app
 
-# Control mode: this program in charge (old PC unplugged); no motion
+# Control mode: this program in charge (old PC unplugged); runs tests
 .venv\Scripts\python -m presscontroller.app --control
 
 # The monitor on a recording, ten times faster than it happened
@@ -50,7 +50,11 @@ $env:QT_QPA_PLATFORM = "offscreen"
 No test opens a serial port. Control mode is tested against
 `tests/controller_fake.py`, a simulated DigiMaxx that answers Proteus' start-up
 as the real one did in every recording, streams after `#B37`, keeps PC mode,
-Peak and break detection, and can have its keypad STOP pressed. The serial tap is tested against simulated ports
+Peak and break detection, and can have its keypad STOP pressed; it also runs a
+test as steps 21, 23 and 26 show (`#O` to START, `#B01` after the approach,
+`#B35`/`#O` to the ramp, `#B18` toggling, `#B02` at the ramp's end, `#B43`
+after Cancel). `tests/test_motion.py` compares what control mode sends with what
+Proteus sent in those recordings, line for line. The serial tap is tested against simulated ports
 that refuse to be written to, and `open_read_only` against a stand-in for
 pyserial that records the order DTR, RTS and `open()` were set in. Everything
 the monitor decides is tested on real captures in `tests/data`:

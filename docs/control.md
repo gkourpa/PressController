@@ -1,15 +1,18 @@
 # Control mode
 
-This program talks to the controller itself, in Proteus' place. **This version
-moves nothing**: it connects, streams, sets Peak and break detection, and
-disconnects.
+This program talks to the controller itself, in Proteus' place: it connects,
+streams, sets Peak and break detection, **runs a test as Proteus does** (START,
+CONTINUE, PAUSE, STOP — [motion](motion.md)), and disconnects. Connecting was
+run on the press on 2026-10-19 (steps 24, 25); a test from this program has not
+been run on the press yet.
 
 ## Before a session
 
 1. Leave the old PC as it is; it stays the fallback.
 2. Take the controller cable off the Y-cable (or the old PC) and plug it
-   **straight into the adapter named in the press file's `[control] port`**
-   (the lab: Digitus "A", COM7). The tap is not needed in control mode: the
+   **straight into the adapter named by the settings' `control_port`**
+   (File → Settings…; the lab: Digitus "A", COM7). The first time it is taken
+   from the press file's `[control] port` and remembered. The tap is not needed in control mode: the
    program records both directions itself.
 3. The press idle, nobody at it.
 4. `python -m presscontroller.app --control`, and confirm the dialog.
@@ -45,16 +48,28 @@ off and PC mode off (`#B36 #B21`) and nothing else.
 
 ## The allowlist
 
-`presscontroller/control/commands.py` — exact lines, checked at the one place
-a byte leaves (`ControllerLink.send`), before writing:
+`presscontroller/control/commands.py`, checked at the one place a byte leaves
+(`ControllerLink.send`), before writing:
 
-- Proteus' start-up lines, `#B37`/`#B36` (stream), `#B21` (PC mode off),
-- `#B30`/`#B31` (Peak), `#B32`/`#B33` (break detection),
-- `#B17` (Cancel: pump off) — for the keypad STOP.
+- **exact lines**: Proteus' start-up, `#B37`/`#B36` (stream), `#B21` (PC mode
+  off), `#B30`/`#B31` (Peak), `#B32`/`#B33` (break detection), `#B17` (Cancel:
+  pump off), and the test's `#B47` START, `#B23` approach, `#B22` ramp,
+  `#B18` PAUSE/CONTINUE, `#B26` answer to the ramp's end;
+- **four built lines, each only inside its range**: the ramp `#D12…` (Path or
+  Force, within the press file's `[limits]` and the channel's range — without
+  `[limits]`, no ramp at all), the start load `#D09…`, the interval `#D05…`, the
+  break threshold `#D21…`.
 
-**Not on it**: `#B47`, `#B23`, `#B22`, `#D12…`, `#D0910`, `#D0520`, `#B18`,
-`#B26` — everything that moves the press or belongs to moving it. A test asserts
-the two sets never meet.
+**Never**: what Proteus' program can send but no recording has shown (`#B24`,
+`#B34`, `#B38`, `#B60`, `#B04`, `#B11`, `#D160`, `#D161`) and Deformation
+control. Tests assert each is refused at the write point.
+
+## A test
+
+See [motion](motion.md) for the sequence, the buttons state by state, and every
+way a test ends in Cancel. What START sends comes from the settings (Proteus'
+test template: Peak, break detection and threshold, start load, ramp, measuring
+interval), edited in File → Settings… and, for the ramp, in the window.
 
 ## Recording
 

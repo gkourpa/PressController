@@ -82,3 +82,42 @@ def test_broken_settings_load_as_defaults_with_the_reason(_sandboxed_settings):
     settings, problem = load_settings()
     assert settings == Settings()
     assert "could not be read" in problem
+
+
+def test_the_test_settings_round_trip(_sandboxed_settings):
+    from presscontroller.config.settings import TemplateSettings
+    s = Settings(control_port="COM7", refresh_hz=1.5,
+                 test=TemplateSettings(peak=True, break_detection=False,
+                                       break_threshold_per_mil=25.0, start_load_percent=0.2,
+                                       ramp_control="force", force_speed_kn_s=5.0,
+                                       force_end_kn=300.0, measuring_interval_ms=100))
+    save_settings(s)
+    assert load_settings() == (s, None)
+
+
+def test_an_unusable_test_value_falls_back_to_its_own_default_and_is_named(_sandboxed_settings):
+    from presscontroller.config.settings import TemplateSettings
+    _sandboxed_settings.parent.mkdir(parents=True)
+    _sandboxed_settings.write_text('control_port = "COM7"\n[test]\nbreak_detection = 1\n'
+                                   'start_load_percent = 5.0\npath_speed_mm_min = 3.0\n'
+                                   'measuring_interval_ms = 205\ncolour = "red"\n',
+                                   encoding="utf-8")
+    settings, problem = load_settings()
+    t = settings.test
+    assert settings.control_port == "COM7" and t.path_speed_mm_min == 3.0   # the rest counts
+    d = TemplateSettings()
+    assert (t.break_detection, t.start_load_percent, t.measuring_interval_ms) == (
+        d.break_detection, d.start_load_percent, d.measuring_interval_ms)
+    for words in ("break_detection must be true or false", "start load 5 %",
+                  "measuring interval 205 ms", "unknown key test.colour"):
+        assert words in problem
+
+
+def test_a_settings_file_from_before_the_test_settings_still_loads(_sandboxed_settings):
+    from presscontroller.config.settings import TemplateSettings
+    _sandboxed_settings.parent.mkdir(parents=True)
+    _sandboxed_settings.write_text('press_file = "C:/p.toml"\ndata_dir = "C:/d"\n',
+                                   encoding="utf-8")
+    settings, problem = load_settings()
+    assert problem is None and settings.test == TemplateSettings()
+    assert settings.test.break_detection is True                  # operator, 2026-10-19

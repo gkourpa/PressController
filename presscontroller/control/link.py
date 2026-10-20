@@ -22,7 +22,7 @@ import time
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
-from presscontroller.control.commands import check
+from presscontroller.control.commands import Limits, check
 from presscontroller.protocol.lines import CTRL_TO_PC, PC_TO_CTRL, LineAssembler
 from presscontroller.tap.capture import CaptureWriter
 from presscontroller.tap.events import TapEvent
@@ -49,10 +49,13 @@ def open_for_control(name: str):
 class ControllerLink:
     """Read the controller's lines; send ours, if they are allowed."""
 
-    def __init__(self, port_name: str, *, capture: CaptureWriter | None = None,
+    def __init__(self, port_name: str, *, limits: Limits | None = None,
+                 capture: CaptureWriter | None = None,
                  open_port: Callable[[str], object] = open_for_control,
                  clock: Callable[[], float] = time.monotonic):
         self.port_name = port_name
+        self.limits = limits
+        """The press file's limits, against which every ramp line is checked."""
         self._capture = capture
         self._open = open_port
         self._clock = clock
@@ -106,7 +109,7 @@ class ControllerLink:
         """Send one allowed line. Raises
         :class:`~presscontroller.control.commands.NotAllowed` — before writing —
         for any other."""
-        check(line)
+        check(line, self.limits)
         if self._port is None:
             raise RuntimeError("the link is not open")
         data = line.encode("ascii") + TERMINATOR

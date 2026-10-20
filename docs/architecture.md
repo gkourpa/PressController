@@ -6,7 +6,8 @@
 presscontroller/
   protocol/  bytes → lines (lines.py), lines → messages and their meanings
              (messages.py); Qt-free, hardware-free, config-free
-  config/    the press file (press.py), the global settings (settings.py), and
+  config/    the press file (press.py), the global settings and the test
+             template's defaults (settings.py), and
              DAqReader's TOML writer and typed readers (toml.py, parse.py)
   tap/       where lines come from: the live SerialTap (read-only), a
              ReplayTap of a capture, and the capture format both share

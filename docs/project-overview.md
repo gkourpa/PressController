@@ -41,9 +41,15 @@ and undocumented, so the protocol is learnt from the live link first.
      display, readings live, PK/BD following the switches, keypad back after
      Disconnect.
    - **3b. Motion.** START / PAUSE / CONTINUE / STOP as the operator named them
-     ([the window](ui.md#the-control-window)); ramp limits enforced before START;
-     the controller's `#B02` (ramp end) answered with `#B26` and Cancel, as
-     Proteus does.
+     ([motion](motion.md), [the window](ui.md#the-control-window)); Proteus'
+     test template as saved settings with a settings dialog; ramp limits
+     enforced at the write point; `#B02` answered with `#B26` and Cancel, as
+     Proteus does; every failure ends in Cancel. Written and tested against the
+     simulated controller, line for line against steps 21, 23 and 26. **Not yet
+     run on the press**: the first run is the five steps in
+     [motion](motion.md#first-run-at-the-press--one-step-at-a-time-operators-hand-on-the-keypad-stop).
+   - **Later**: Proteus' UNLOAD and Cycle start elements, each after its own
+     recording (operator, 2026-10-20).
 4. A test editor, results and reports to replace what operators use in Proteus.
 5. Frozen Windows build and installer, as DAqReader's.
 

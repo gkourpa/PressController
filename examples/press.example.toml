@@ -12,8 +12,9 @@ resolution = 600000
 pc_port = "COM1"     # the adapter whose RX hears line pin 3 (PC -> controller)
 ctrl_port = "COM2"   # the adapter whose RX hears line pin 2 (controller -> PC)
 
-# Only for control mode (python -m presscontroller.app --control), with the old
-# PC unplugged: the adapter the controller cable is plugged straight into.
+# Only for control mode, with the old PC unplugged: the adapter the controller
+# cable is plugged straight into. Used the first time only; after that the
+# settings' control_port (File -> Settings...) is what counts.
 [control]
 port = "COM2"
 

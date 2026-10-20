@@ -7,11 +7,12 @@
     python -m presscontroller.app --press PRESS.toml    # another press file
     python -m presscontroller.app --control             # this program in charge
 
-**Control mode** talks to the controller itself, through the press file's
-``[control] port``, with the old PC unplugged. It asks for that to be confirmed
-on every launch, and can send nothing that moves the press
-(:mod:`presscontroller.control`). Its captures and tests go where the monitor's
-do, named ``*_control.jsonl``.
+**Control mode** talks to the controller itself, with the old PC unplugged,
+through the settings' ``control_port`` (the first time, the press file's
+``[control] port``, then remembered). It asks for that to be confirmed on every
+launch, and runs tests as Proteus does, within the press file's ``[limits]``
+(:mod:`presscontroller.control`, docs/motion.md). Its captures and tests go
+where the monitor's do, named ``*_control.jsonl``.
 
 The press file and the data folder are asked for once and remembered in the
 global settings. Live, every byte heard goes to ``<data>/captures/`` and every
@@ -47,7 +48,7 @@ def _args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--replay", help="replay a capture instead of listening to the tap")
     p.add_argument("--speed", type=float, default=1.0, help="replay speed (default 1)")
     p.add_argument("--control", action="store_true",
-                   help="talk to the controller ourselves (old PC unplugged); no motion")
+                   help="talk to the controller ourselves (old PC unplugged)")
     return p.parse_args(argv)
 
 
@@ -118,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
         source = SerialTap(press.pc_port, press.ctrl_port, capture=capture)
     save_settings(settings)
 
-    win = MainWindow(Monitor(press), source, tests_dir=tests_dir)
+    win = MainWindow(Monitor(press), source, tests_dir=tests_dir, settings=settings)
     try:
         win.start()
     except Exception as exc:
@@ -139,23 +140,27 @@ Before continuing, check:
   • the controller cable is plugged straight into the adapter on {port};
   • the press is idle and nobody is at it.
 
-This version can connect, show the measurements and switch Peak and break
-detection. It cannot send anything that moves the press. Pressing STOP on the
-controller's keypad hands control back to the keypad at once.
+This program can run a test: START, PAUSE, CONTINUE and STOP (Cancel), with
+ramps limited by the press file's [limits]. STOP, or Esc, is Cancel: pump off.
+Pressing STOP on the controller's keypad hands control back to the keypad at
+once. Keep a hand on the controller's STOP during every test.
 
 Continue?"""
 
 
 def _run_control(app, settings, press: PressConfig) -> int:
     from presscontroller.app.control_window import ControlWindow
-    from presscontroller.control import ControllerLink, ControllerSession
+    from presscontroller.control import ControllerLink, ControllerSession, Limits
 
-    if not press.control_port.strip():
-        QMessageBox.warning(None, DISPLAY_NAME, "The press file has no [control] port: name "
-                            "the adapter the controller cable is plugged into.")
+    port = settings.control_port or press.control_port.strip()
+    if not port:
+        QMessageBox.warning(None, DISPLAY_NAME, "No control port is set: name the adapter "
+                            "the controller cable is plugged into — control_port in the "
+                            "settings file, or [control] port in the press file. (Once set, "
+                            "File → Settings… changes it.)")
         return 1
-    answer = QMessageBox.question(None, DISPLAY_NAME,
-                                  CONFIRM_CONTROL.format(port=press.control_port))
+    settings = replace(settings, control_port=port)
+    answer = QMessageBox.question(None, DISPLAY_NAME, CONFIRM_CONTROL.format(port=port))
     if answer != QMessageBox.StandardButton.Yes:
         return 0
     data_dir = _choose_data_dir(settings)
@@ -166,15 +171,17 @@ def _run_control(app, settings, press: PressConfig) -> int:
     start = datetime.now()
     capture = CaptureWriter(
         Path(data_dir) / "captures" / f"{start:%Y%m%d_%H%M%S}_control.jsonl",
-        ports={"control": press.control_port}, settings=LINE_SETTINGS, start=start)
-    session = ControllerSession(ControllerLink(press.control_port, capture=capture))
-    win = ControlWindow(Monitor(press), session, tests_dir=Path(data_dir) / "tests")
+        ports={"control": port}, settings=LINE_SETTINGS, start=start)
+    session = ControllerSession(ControllerLink(port, limits=Limits.from_press(press),
+                                               capture=capture))
+    win = ControlWindow(Monitor(press), session, tests_dir=Path(data_dir) / "tests",
+                        settings=settings)
     try:
         win.start()
     except Exception as exc:
         session.close()
         QMessageBox.critical(None, DISPLAY_NAME,
-                             f"{press.control_port} could not be opened: {exc}\n\nIs the "
+                             f"{port} could not be opened: {exc}\n\nIs the "
                              "adapter plugged in, and is the monitor or the sniffer still "
                              "using it?")
         return 1
