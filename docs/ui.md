@@ -97,7 +97,10 @@ two bars on top. The connection bar:
   test they are locked.
 - **Connect** / **Disconnect**.
 
-The test bar: the test's phase; the ramp — control (Path or Force), speed, end,
+The test bar: the test's phase; **Piston: going down / still / going up** with
+its rate, large, from the Path readings of the last 2 s — after a STOP the
+operator must see whether the piston has started sinking (operator,
+2026-10-20); the ramp — control (Path or Force), speed, end,
 and the press file's limit beside it (an edit is saved as the settings' ramp);
 and the buttons, named as the operator asked (2026-10-19):
 
@@ -110,7 +113,9 @@ and the buttons, named as the operator asked (2026-10-19):
 
 **PAUSE is not a safety stop**: it freezes the ramp's target, so a piston that
 lags its target keeps going (step 22). STOP is Cancel: red, on the **Esc** key,
-available whenever connected.
+available whenever connected. Like the keypad's STOP it can be pressed again:
+after a break the first press stops the pump, the next releases the load and the
+piston sinks, the next stops the sinking (step 33).
 
 **Settings…** (File menu, both windows, as DAqReader's): the screen's redraw
 ceiling, control mode's port, and the test — Proteus' template: Peak, break

@@ -53,6 +53,10 @@ from presscontroller.tap.events import TapEvent
 #: change of speed shows within it.
 RATE_WINDOW_S = 2.0
 
+#: Below this path rate, in mm/min, the piston counts as still. The slowest
+#: ramp run is 1 mm/min; the stream's noise on Path is a few µm.
+PISTON_STILL_MM_MIN = 0.3
+
 #: Seconds at the start of a ramp left out of its measured rate. They are the
 #: servo taking up the load — 5.4 mm/min for a moment in a 3 mm/min ramp, force
 #: dipping and then jumping 8 kN at the start of a 2 kN/s ramp (step 21) — and
@@ -347,6 +351,24 @@ class Monitor:
         if t_b - t_a < RATE_WINDOW_S / 2 or index not in a or index not in b:
             return None
         return (self.value(index, b[index]) - self.value(index, a[index])) / (t_b - t_a)
+
+    def piston(self) -> tuple[str, float] | None:
+        """Which way the piston is going, in words, and its rate in mm/min —
+        ``("going down", -12.1)``, ``("still", 0.0)``, ``("going up", 2.1)`` —
+        from the Path channel over the last :data:`RATE_WINDOW_S`; ``None``
+        without readings.
+
+        After a STOP the operator needs to see whether the piston has started
+        sinking (operator, 2026-10-20); a path reading creeping by a few µm is
+        not movement, so under :data:`PISTON_STILL_MM_MIN` it is "still".
+        """
+        per_s = self.rate(self.path_index)
+        if per_s is None:
+            return None
+        mm_min = per_s * 60
+        if abs(mm_min) < PISTON_STILL_MM_MIN:
+            return "still", 0.0
+        return ("going up" if mm_min > 0 else "going down"), mm_min
 
     def pop_closed(self) -> list[TestRecord]:
         """Tests closed since the last call — the ones to save."""

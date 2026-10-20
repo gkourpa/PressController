@@ -318,3 +318,22 @@ def test_a_ramp_at_the_limit_is_not_a_breach(press):
     # 10 mm/min is sent as 167 um/s, which is 10.02 mm/min: rounding, not a breach.
     m, _ = replay_all(press, REAL_TEST)
     assert not any("limit" in w for w in m.tests[0].warnings)
+
+
+def test_the_piston_is_said_to_go_down_while_it_sinks(press):
+    """Step 33: after the second STOP the piston sank at 12-15 mm/min, and a
+    third STOP stopped it at 74.28 mm."""
+    from presscontroller.monitor import Monitor
+    from presscontroller.tap import read_capture
+    from tests.conftest import ROOT
+    m = Monitor(press)
+    seen = {}
+    for ev in read_capture(ROOT / "captures" /
+                           "20261020_112855_step33_second_cancel_releases_after_break.jsonl"):
+        m.feed(ev)
+        for t in (160.0, 120.0, 190.0):
+            if t not in seen and ev.t >= t:
+                seen[t] = m.piston()
+    assert seen[160.0][0] == "going down" and -16 < seen[160.0][1] < -10
+    assert seen[120.0][0] == "going up"          # the ramp, 2 mm/min
+    assert seen[190.0] == ("still", 0.0)         # after the third STOP

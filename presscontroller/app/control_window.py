@@ -20,6 +20,11 @@ launch starts from it. START is available only when the session can build every
 line of the test — a ramp above the press file's ``[limits]`` disables it, and
 the reason is shown beside it.
 
+**Piston: going down / still / going up**, large, beside the test's phase,
+redrawn with the readings: after a STOP the operator must see whether the
+piston has started sinking (operator, 2026-10-20). Pressing STOP again — like
+the keypad's — releases a held load and then stops the sinking (step 33).
+
 **STOP is always Cancel** (``#B17``: pump off, load released), red, and on the
 **Esc** key; it is available whenever connected. PAUSE is not a stop: the
 message line says so when it is pressed. The controller's own STOP and the press's emergency stop stay the primary
@@ -97,6 +102,11 @@ class ControlWindow(MainWindow):
         self.end_box.setDecimals(3)
         self.end_box.setRange(0.001, 100000.0)
         self.limit_lbl = QLabel()
+        self.piston_lbl = _bold(QLabel("Piston: –"))
+        f = self.piston_lbl.font()
+        f.setPointSizeF(f.pointSizeF() * 1.4)
+        self.piston_lbl.setFont(f)
+        self.piston_lbl.setMinimumWidth(320)
         self.start_btn = QPushButton("START")
         self.start_btn.clicked.connect(self._start)
         self.pause_btn = QPushButton("PAUSE")
@@ -117,6 +127,7 @@ class ControlWindow(MainWindow):
         trow = QHBoxLayout(test_bar)
         trow.setContentsMargins(10, 4, 10, 4)
         trow.addWidget(self.run_lbl, 1)
+        trow.addWidget(self.piston_lbl)
         trow.addWidget(QLabel("Ramp"))
         for w in (self.control_box, self.speed_box, QLabel("to"), self.end_box,
                   self.limit_lbl, self.start_btn, self.pause_btn, self.continue_btn,
@@ -153,6 +164,16 @@ class ControlWindow(MainWindow):
             self.say(m.text, warn=m.level == "warn", error=m.level == "error")
         if (self.session.state, self.session.test) != self._shown:
             self._update_controls()
+
+    def _refresh(self) -> None:
+        super()._refresh()
+        p = self.monitor.piston()
+        if p is None:
+            self.piston_lbl.setText("Piston: –")
+        elif p[0] == "still":
+            self.piston_lbl.setText("Piston: still")
+        else:
+            self.piston_lbl.setText(f"Piston: {p[0]}, {p[1]:+.1f} mm/min")
 
     # ---- switches and settings ------------------------------------------------
 
