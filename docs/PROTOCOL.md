@@ -344,6 +344,20 @@ Never seen before — every earlier test had break detection off. The drop match
 never had 40 kN to lose, and no `#B27` came. → **`#B27` = break detected** (hypothesis: the force
 fell by the threshold from its peak). During a test, control mode answers it with STOP.
 
+### Break detection slows a path ramp, 2026-10-20, `captures/20261020_104728_step28_path_2mm_min_break_detection_off.jsonl`
+
+Step 27's ramp, `#D1233;0;100000;0;1` (2 mm/min) on the same specimen at 67 mm, ran at only
+**0.74 mm/min** (force 0.88 kN/s), where Proteus' identical line in step 23 ran at 2.10 mm/min. Step
+28 repeated it from control mode with **break detection off** (`#B32`, no `#D21`) and CONTINUE 9 s
+after the start load: **2.12 mm/min** (3.35 kN/s) — as Proteus. Measured over the same window (3–22 s
+after `#B22`) in all three. So with break detection on (`#B33` `#D21100`) **the controller ran the path
+ramp at about a third of its speed**. Why is not known; Proteus never ran a ramp with break detection
+on in any recording.
+
+Proteus' own path ramps under load also show a ceiling (break detection off): 10 mm/min ran at 2.23
+(step 15), 3 at 2.33 (step 17), 2 at 2.09 (23), 1 at 1.11 (18); only step 19, without load, ran 10 at
+9.77. Step 15's "slow ramp" was this ceiling, not Proteus.
+
 ### Control mode: this program in Proteus' place, 2026-10-19, `captures/20261019_174926_step24_control_connect.jsonl`, `…175412_step25_control_connect_again.jsonl`
 
 The old PC unplugged; the controller cable straight into a Digitus adapter (COM7). This program sent
@@ -481,7 +495,8 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 - Which start-up command makes **PC** / **FO** appear on the controller display.
 - Meaning of display indicators ZB, (bottom) FO, LD.
 - What Proteus puts in the ramp's start field (0×, 1×, 2×, 0×, 0× the piston position in steps 15–19); it does not affect the speed (steps 17–19).
-- Why step 15's 10 mm/min ramp ran at 2.06 mm/min; step 19 ran 10 mm/min correctly (at 7–9 kN).
+- Why break detection on (`#B33` `#D21…`) runs a path ramp at about a third of its speed (steps 27, 28), and whether the threshold or break detection itself does it.
+- What limits a path ramp under load to about 2.3 mm/min (steps 15, 17); step 19 ran 10 mm/min without load.
 - Ramp field 4 (`0`) and whether field 5 changes with Force/Deformation control.
 - Whether `#B27` (step 27) is the break report at a real failure, and whether the controller stops the pump by itself on it.
 - Whether other keypad keys (START, ZERO, PEAK…) are forwarded like STOP (`#B28`) in PC mode.

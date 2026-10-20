@@ -21,8 +21,8 @@ line of the test — a ramp above the press file's ``[limits]`` disables it, and
 the reason is shown beside it.
 
 **STOP is always Cancel** (``#B17``: pump off, load released), red, and on the
-**Esc** key; it is available whenever connected. PAUSE is not a stop and says
-so. The controller's own STOP and the press's emergency stop stay the primary
+**Esc** key; it is available whenever connected. PAUSE is not a stop: the
+message line says so when it is pressed. The controller's own STOP and the press's emergency stop stay the primary
 safety devices.
 """
 
@@ -99,7 +99,7 @@ class ControlWindow(MainWindow):
         self.limit_lbl = QLabel()
         self.start_btn = QPushButton("START")
         self.start_btn.clicked.connect(self._start)
-        self.pause_btn = QPushButton("PAUSE (not a stop)")
+        self.pause_btn = QPushButton("PAUSE")
         self.pause_btn.clicked.connect(self.session.pause_test)
         self.continue_btn = QPushButton("CONTINUE")
         self.continue_btn.clicked.connect(self.session.continue_test)

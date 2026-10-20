@@ -91,7 +91,9 @@ Anything else is refused before a byte is written.
   switches show (`#B33` followed by `#D21…`), `#D09…`, `#B23` — Proteus' order
   (step 26).
 - **STOP is always `#B17`** (Proteus' Cancel: pump off, load released), large,
-  red, and also on the **Esc** key. PAUSE is labelled as not a stop.
+  red, and also on the **Esc** key. PAUSE is not a stop; the message line says
+  so when it is pressed (the button itself just reads PAUSE — operator,
+  2026-10-20).
 - START shows the ramp it will send in words ("Path 2 mm/min to 100 mm").
 - With break detection on, **the controller reports a break as `#B27`**
   (hypothesis, step 27: it came as the force fell 40 kN — the 10 ‰ threshold of
