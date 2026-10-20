@@ -337,3 +337,36 @@ def test_the_load_released_after_stop_is_not_mistaken_for_trouble(limits):
         assert not [m for m in s.pop_messages() if m.level == "error"]
     finally:
         s.close()
+
+
+def test_a_break_reported_during_a_ramp_stops_the_test(limits):
+    # Step 27: #B27 came as the force fell 40 kN with break detection on.
+    fake = FakeController()
+    s = _connected(fake, limits, break_detection=True)
+    try:
+        s.start_test(PATH_2_TO_100)
+        _run(s, lambda s: s.test is RunPhase.AT_START_LOAD)
+        s.continue_test()
+        _run(s, lambda s: s.test is RunPhase.RAMP)
+        fake.say("#B27")
+        _run(s, lambda s: s.test is RunPhase.NONE)
+        assert fake.written[-1] == "#B17"
+        assert "reported a break" in s.pop_messages()[-1].text
+    finally:
+        s.close()
+
+
+def test_a_break_reported_after_stop_changes_nothing(limits):
+    fake = FakeController()
+    s = _connected(fake, limits, break_detection=True)
+    try:
+        s.start_test(PATH_2_TO_100)
+        _run(s, lambda s: s.test is RunPhase.AT_START_LOAD)
+        s.stop()
+        fake.say("#B27")
+        end = time.monotonic() + 0.2
+        while time.monotonic() < end:
+            s.poll()
+        assert fake.written.count("#B17") == 1 and s.state is SessionState.CONNECTED
+    finally:
+        s.close()

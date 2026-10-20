@@ -330,6 +330,20 @@ controller answered neither. Both approaches ended against something at **67.1 m
 3.6 kN, the force overshooting to **19.7 kN** within 2 s and settling at ~11.7 kN until Cancel —
 the "20 kN" the operator sees at the start load is this overshoot, not a setting.
 
+### The first test from this program, 2026-10-20, `captures/20261020_103911_step27_first_test_from_control_mode.jsonl`
+
+Control mode (COM7, no Proteus), break detection on (10 ‰), Path 2 mm/min to 100 mm. START →
+`#B47` `#O` `#B30` `#B33` `#D21100` `#D0910` `#B23`; `#B01` at 67.1 mm, 3.8 kN; CONTINUE →
+`#D0520` `#D1233;0;100000;0;1` `#B35` `#B22` `#O`; PAUSE (`#B18`) at 53.7 kN — the force held
+(51.4 kN 9 s later); CONTINUE (`#B18`); STOP (`#B17`) at 74.9 kN → load released, piston back to
+63.9 mm; `#B43` 20 s later. Line for line what Proteus sends.
+
+**New: `#B27` from the controller**, 0.8 s after the STOP, as the force fell from 74.9 to 35.6 kN.
+Never seen before — every earlier test had break detection off. The drop matches the threshold:
+10 ‰ of the 4000 kN range is **40 kN**. In step 26 (break detection on, Cancel at ~12 kN) the force
+never had 40 kN to lose, and no `#B27` came. → **`#B27` = break detected** (hypothesis: the force
+fell by the threshold from its peak). During a test, control mode answers it with STOP.
+
 ### Control mode: this program in Proteus' place, 2026-10-19, `captures/20261019_174926_step24_control_connect.jsonl`, `…175412_step25_control_connect_again.jsonl`
 
 The old PC unplugged; the controller cable straight into a Digitus adapter (COM7). This program sent
@@ -414,6 +428,7 @@ validity question and "keep measuring" send nothing.
 |---|---|---|---|
 | `#B01` | CTRL | start load reached | confirmed |
 | `#B02` | CTRL | ramp end reached (force ramp at its end force) | confirmed (step 21) |
+| `#B27` | CTRL | break detected: with break detection on, the force fell by the threshold (10 ‰ of range = 40 kN) from its peak | hypothesis (step 27) |
 | `#B28` | CTRL | keypad STOP pressed (in PC mode, not obeyed locally) | confirmed |
 | `#B35` | CTRL | answer to the ramp definition | hypothesis |
 | `#B43` | CTRL | test over, load released | hypothesis |
@@ -468,7 +483,7 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 - What Proteus puts in the ramp's start field (0×, 1×, 2×, 0×, 0× the piston position in steps 15–19); it does not affect the speed (steps 17–19).
 - Why step 15's 10 mm/min ramp ran at 2.06 mm/min; step 19 ran 10 mm/min correctly (at 7–9 kN).
 - Ramp field 4 (`0`) and whether field 5 changes with Force/Deformation control.
-- Whether break detection (`#B33`) is ever enabled by a template, and what the controller sends on break.
+- Whether `#B27` (step 27) is the break report at a real failure, and whether the controller stops the pump by itself on it.
 - Whether other keypad keys (START, ZERO, PEAK…) are forwarded like STOP (`#B28`) in PC mode.
 - Meaning of `#D0910`, controller `#B35`, `#B43`; what the `8` after `#D0` is.
 - What `#B34`, `#B38` and `#B60` do (in Proteus' program, never seen on the line).

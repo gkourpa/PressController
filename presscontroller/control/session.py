@@ -338,6 +338,9 @@ class ControllerSession:
                 self._say(f"Ramp running: {self.plan.told if self.plan else ''}. "
                           "STOP (or Esc) stops the pump.")
             return
+        if isinstance(msg, Command) and msg.code == 27:
+            self._stop_for("the controller reported a break (#B27)")
+            return
         if not isinstance(msg, Command) or msg.code not in EXPLAINED_EVENTS:
             self._stop_for(f"the controller said {ev.text!r}, which no recording explains "
                            "(it may be how it tells a break)")

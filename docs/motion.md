@@ -1,4 +1,4 @@
-# Milestone 3b — motion (built and tested against the simulated controller; not yet run on the press)
+# Milestone 3b — motion (first run on the press 2026-10-20, step 27)
 
 The control window gets **START / PAUSE / CONTINUE / STOP**, and sends exactly
 what Proteus sends for the same buttons. What Proteus keeps in its test template
@@ -93,10 +93,11 @@ Anything else is refused before a byte is written.
 - **STOP is always `#B17`** (Proteus' Cancel: pump off, load released), large,
   red, and also on the **Esc** key. PAUSE is labelled as not a stop.
 - START shows the ramp it will send in words ("Path 2 mm/min to 100 mm").
-- With break detection on, **the controller itself reacts to the break**. What
-  it then sends has never been recorded, so the first break is learnt at the
-  press (step 5 below); until it is decoded, any unexplained controller line
-  during a test is answered with STOP.
+- With break detection on, **the controller reports a break as `#B27`**
+  (hypothesis, step 27: it came as the force fell 40 kN — the 10 ‰ threshold of
+  the range — after a STOP). During a test it is answered with STOP; so is any
+  other controller line no recording explains. Step 5 below confirms it at a
+  real failure.
 
 ## When something goes wrong — every case ends in `#B17`
 

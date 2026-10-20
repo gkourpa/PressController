@@ -45,8 +45,10 @@ and undocumented, so the protocol is learnt from the live link first.
      test template as saved settings with a settings dialog; ramp limits
      enforced at the write point; `#B02` answered with `#B26` and Cancel, as
      Proteus does; every failure ends in Cancel. Written and tested against the
-     simulated controller, line for line against steps 21, 23 and 26. **Not yet
-     run on the press**: the first run is the five steps in
+     simulated controller, line for line against steps 21, 23 and 26. **First run
+     on the press 2026-10-20** (step 27): START, start load, CONTINUE, PAUSE,
+     CONTINUE, STOP on a specimen, line for line as Proteus; the controller's
+     `#B27` (break detected?) seen for the first time. The remaining steps are in
      [motion](motion.md#first-run-at-the-press--one-step-at-a-time-operators-hand-on-the-keypad-stop).
    - **Later**: Proteus' UNLOAD and Cycle start elements, each after its own
      recording (operator, 2026-10-20).

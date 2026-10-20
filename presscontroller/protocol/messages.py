@@ -233,6 +233,8 @@ COMMANDS: dict[tuple[str, int], Meaning] = {
     (PC_TO_CTRL, 52): Meaning("start-up query", False),
     (CTRL_TO_PC, 1): Meaning("start load reached", True),
     (CTRL_TO_PC, 2): Meaning("ramp end reached", True),
+    (CTRL_TO_PC, 27): Meaning("break detected (break detection on; the force fell by the "
+                              "threshold from its peak)", False),
     (CTRL_TO_PC, 28): Meaning("keypad STOP pressed", True),
     (CTRL_TO_PC, 35): Meaning("answer to the ramp", False),
     (CTRL_TO_PC, 43): Meaning("test over, load released", False),
