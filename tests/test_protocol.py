@@ -13,6 +13,7 @@ from presscontroller.protocol import (
     LineAssembler,
     Ramp,
     Reply,
+    ReportLine,
     Sample,
     SetParam,
     Unknown,
@@ -141,3 +142,19 @@ def test_the_break_threshold_is_the_templates_value_times_ten():
     # Step 26: Proteus' template at 10 and at 25 per mil.
     assert BreakThreshold(100).per_mil == 10.0
     assert describe(PC_TO_CTRL, BreakThreshold(250)) == "break threshold 25 ‰"
+
+
+def test_the_controllers_own_report_is_read_as_its_lines():
+    # Step 31: sent on leaving PC mode during a test.
+    assert parse(CTRL_TO_PC, "      BREAK            44.9 kN") == ReportLine("BREAK", "44.9 kN")
+    assert parse(CTRL_TO_PC, "      DEFORM        + 67.39 mm") == ReportLine("DEFORM", "+ 67.39 mm")
+    assert parse(CTRL_TO_PC, "      AGE               0 Days") == ReportLine("AGE", "0 Days")
+    assert describe(CTRL_TO_PC, ReportLine("BREAK", "44.9 kN")) == (
+        "the controller's own report")
+    # From the PC, or without the indent, it is not a report.
+    assert parse(PC_TO_CTRL, "      BREAK            44.9 kN") == Unknown("      BREAK            44.9 kN")
+    assert parse(CTRL_TO_PC, "BREAK 44.9 kN") == Unknown("BREAK 44.9 kN")
+
+
+def test_a_line_not_in_the_notes_is_said_once():
+    assert describe(CTRL_TO_PC, Unknown("#X")) == ""

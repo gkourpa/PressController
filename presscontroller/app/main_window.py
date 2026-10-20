@@ -241,9 +241,12 @@ class MainWindow(QMainWindow):
         self._logged = m.log_total
         for e in (list(m.log)[-fresh:] if fresh > 0 else []):
             arrow = "PC → CTRL" if e.direction == PC_TO_CTRL else "CTRL → PC"
-            mark = "" if e.known else "  !! not in the protocol notes"
+            mark = "" if e.known else "!! not in the protocol notes"
+            # A known line is shown without its padding (the controller's
+            # report is indented); a line not in the notes exactly as it came.
+            text = e.text.strip() if e.known else e.text
             self.log_view.appendPlainText(
-                f"{e.wall:%H:%M:%S.%f}"[:-3] + f"  {arrow}  {e.text:<26} {e.meaning}{mark}")
+                f"{e.wall:%H:%M:%S.%f}"[:-3] + f"  {arrow}  {text:<26} {e.meaning}{mark}")
 
     def _refresh(self) -> None:
         m = self.monitor

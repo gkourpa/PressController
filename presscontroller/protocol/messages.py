@@ -12,6 +12,7 @@ line                    from        message
 ``#D0<p><v>``           PC          :class:`SetParam` — one digit of parameter, value
 ``#D12<v>;<a>;<b>;…``   PC          :class:`Ramp` — the main test's definition
 ``#D21<n>``             PC          :class:`BreakThreshold` — after break detection on
+``   NAME   value``      controller  :class:`ReportLine` — its own test report
 anything else           either      :class:`Unknown`, kept verbatim
 ======================  ==========  ===============================================
 
@@ -137,13 +138,25 @@ class BreakThreshold:
 
 
 @dataclass(frozen=True)
+class ReportLine:
+    """One line of the controller's own test report — indented text, a name in
+    capitals and its value: ``      BREAK            44.9 kN``. Sent once, on
+    leaving PC mode during a test (step 31): ``DATE``, ``IDENT``, ``ORDER``,
+    ``TESTER``, ``AGE``, ``BREAK``, ``DEFORM``. The value is kept as text."""
+
+    name: str
+    value: str
+
+
+@dataclass(frozen=True)
 class Unknown:
     """A line no rule here covers, kept exactly as it arrived."""
 
     text: str
 
 
-Message = Sample | Reply | Ack | Command | SetParam | Ramp | BreakThreshold | Unknown
+Message = (Sample | Reply | Ack | Command | SetParam | Ramp | BreakThreshold | ReportLine
+           | Unknown)
 
 #: The ramp channels whose units are confirmed: 0 (Force, N and N/s) and 1 (Path,
 #: µm and µm/s). A ramp on any other channel is kept, but its numbers are not read
@@ -168,6 +181,7 @@ _COMMAND = re.compile(r"#B(\d\d)")
 _RAMP = re.compile(r"#D12(\d+);(-?\d+);(-?\d+);(-?\d+);(-?\d+)")
 _PARAM = re.compile(r"#D0(\d)(\d+)")
 _BREAK_THRESHOLD = re.compile(r"#D21(\d+)")
+_REPORT = re.compile(r" {2,}([A-Z]{2,}) {2,}(\S.*?)\s*")
 
 
 def parse(direction: str, text: str) -> Message:
@@ -187,6 +201,8 @@ def parse(direction: str, text: str) -> Message:
             return Sample(int(m[1]), int(m[2]), dict(zip(nums[0::2], nums[1::2])))
         if m := _REPLY.fullmatch(text):
             return Reply(m[1])
+        if m := _REPORT.fullmatch(text):
+            return ReportLine(m[1], m[2])
     elif direction == PC_TO_CTRL:
         if m := _RAMP.fullmatch(text):
             return Ramp(*(int(g) for g in m.groups()))
@@ -278,10 +294,12 @@ def describe(direction: str, msg: Message, units: dict[int, str] | None = None) 
                         f"{msg.start}, end {msg.end} (units not decoded for this channel)")
             return (f"ramp on channel {msg.channel}: {rate_text(msg.rate, unit)} from "
                     f"{msg.start_value:g} to {msg.end_value:g} {unit}")
+        case ReportLine(name, value):
+            return "the controller's own report"
         case BreakThreshold():
             return f"break threshold {msg.per_mil:g} ‰"
         case Sample():
             return "measurement"
         case Unknown():
-            return "not in the protocol notes"
+            return ""
     return ""
