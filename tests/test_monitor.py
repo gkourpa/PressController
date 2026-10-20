@@ -328,8 +328,8 @@ def test_the_piston_is_said_to_go_down_while_it_sinks(press):
     from tests.conftest import ROOT
     m = Monitor(press)
     seen = {}
-    for ev in read_capture(ROOT / "captures" /
-                           "20261020_112855_step33_second_cancel_releases_after_break.jsonl"):
+    # Step 33, whole (it is under 200 s): break, STOP sinks, STOP stops.
+    for ev in read_capture(ROOT / "tests" / "data" / "break_then_sink.jsonl"):
         m.feed(ev)
         for t in (160.0, 120.0, 190.0):
             if t not in seen and ev.t >= t:

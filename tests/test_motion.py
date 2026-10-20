@@ -27,7 +27,7 @@ from presscontroller.tap import read_capture
 from tests.conftest import FORCE_2_TO_END, PATH_2_PAUSE, ROOT
 from tests.controller_fake import FakeController
 
-STEP_26 = ROOT / "captures" / "20261020_101100_step26_break_threshold_10_25.jsonl"
+STEP_26 = ROOT / "tests" / "data" / "break_threshold_start.jsonl"   # step 26, to its first #B23
 
 #: Proteus' template in steps 21 and 23: Peak off, break identification off.
 FORCE_2_TO_100 = TemplateSettings(ramp_control="force", force_speed_kn_s=2.0,
