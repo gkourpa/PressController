@@ -337,3 +337,19 @@ def test_the_piston_is_said_to_go_down_while_it_sinks(press):
     assert seen[160.0][0] == "going down" and -16 < seen[160.0][1] < -10
     assert seen[120.0][0] == "going up"          # the ramp, 2 mm/min
     assert seen[190.0] == ("still", 0.0)         # after the third STOP
+
+
+def test_a_still_piston_reads_still_without_flickering(press):
+    """2026-10-20, 11:38: four of fifty idle minutes after a cube test; the first
+    label flickered between still, up and down on the Path reading's noise."""
+    from presscontroller.monitor import Monitor
+    from presscontroller.tap import read_capture
+    from tests.conftest import DATA
+    m = Monitor(press)
+    words = set()
+    for ev in read_capture(DATA / "piston_still_4_min.jsonl"):
+        m.feed(ev)
+        p = m.piston()
+        if p is not None:
+            words.add(p[0])
+    assert words == {"still"}

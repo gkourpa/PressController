@@ -53,9 +53,13 @@ from presscontroller.tap.events import TapEvent
 #: change of speed shows within it.
 RATE_WINDOW_S = 2.0
 
-#: Below this path rate, in mm/min, the piston counts as still. The slowest
-#: ramp run is 1 mm/min; the stream's noise on Path is a few µm.
-PISTON_STILL_MM_MIN = 0.3
+#: Which way the piston goes is a straight line fitted to the Path readings of
+#: the last :data:`PISTON_WINDOW_S`; under :data:`PISTON_STILL_MM_MIN` it is
+#: "still". Measured on 50 idle minutes (2026-10-20, 11:38): over 5 s the fit
+#: stays within ±0.43 mm/min at rest — 2 s end points reached ±1.2 and made the
+#: label flicker — while a 2 mm/min ramp fits at 1.8–1.9 and sinking at −12.
+PISTON_WINDOW_S = 5.0
+PISTON_STILL_MM_MIN = 0.6
 
 #: Seconds at the start of a ramp left out of its measured rate. They are the
 #: servo taking up the load — 5.4 mm/min for a moment in a 3 mm/min ramp, force
@@ -239,6 +243,7 @@ class Monitor:
         self.log_total = 0
         """Entries ever logged; the log keeps only the newest :data:`MAX_LOG`."""
         self._recent: deque[tuple[float, dict[int, int]]] = deque()
+        self._path_recent: deque[tuple[float, float]] = deque()
         self._closed: list[TestRecord] = []
         self.unknown_lines = 0
         self._units = {c.index: c.unit for c in press.channels}
@@ -355,17 +360,23 @@ class Monitor:
     def piston(self) -> tuple[str, float] | None:
         """Which way the piston is going, in words, and its rate in mm/min —
         ``("going down", -12.1)``, ``("still", 0.0)``, ``("going up", 2.1)`` —
-        from the Path channel over the last :data:`RATE_WINDOW_S`; ``None``
-        without readings.
+        from the Path channel: a straight line fitted to the last
+        :data:`PISTON_WINDOW_S`; ``None`` until half that is covered.
 
         After a STOP the operator needs to see whether the piston has started
-        sinking (operator, 2026-10-20); a path reading creeping by a few µm is
+        sinking (operator, 2026-10-20); a path reading wandering by a few µm is
         not movement, so under :data:`PISTON_STILL_MM_MIN` it is "still".
         """
-        per_s = self.rate(self.path_index)
-        if per_s is None:
+        pts = self._path_recent
+        if len(pts) < 3 or pts[-1][0] - pts[0][0] < PISTON_WINDOW_S / 2:
             return None
-        mm_min = per_s * 60
+        n = len(pts)
+        mt = sum(t for t, _ in pts) / n
+        mp = sum(p for _, p in pts) / n
+        den = sum((t - mt) ** 2 for t, _ in pts)
+        if den <= 0:
+            return None
+        mm_min = 60 * sum((t - mt) * (p - mp) for t, p in pts) / den
         if abs(mm_min) < PISTON_STILL_MM_MIN:
             return "still", 0.0
         return ("going up" if mm_min > 0 else "going down"), mm_min
@@ -411,6 +422,11 @@ class Monitor:
         self._recent.append((ev.t, dict(s.raw)))
         while self._recent and ev.t - self._recent[0][0] > RATE_WINDOW_S:
             self._recent.popleft()
+        if self.path_index is not None and self.path_index in s.raw:
+            self._path_recent.append((ev.t, self.value(self.path_index,
+                                                      s.raw[self.path_index])))
+            while ev.t - self._path_recent[0][0] > PISTON_WINDOW_S:
+                self._path_recent.popleft()
         test = self.current
         if test is not None:
             test.add_sample(ev.t - test.t0, s.counter, self.phase, s.raw)

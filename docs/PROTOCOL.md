@@ -371,6 +371,13 @@ Proteus' path ramps under load, for comparison: 10 mm/min ran at 2.23 (step 15, 
 3 at 2.33 (step 17), 2 at 2.09 (23), 1 at 1.11 (18); step 19 ran 10 at 9.77 on a specimen that hardly
 loaded. Whether the press also has a ceiling near 2.3 mm/min under load (step 17) is open.
 
+### A third cube, and the piston label, 2026-10-20, `data/tests/captures/20261020_113815_control.jsonl` (73 min, 60 MB: not in git; 4 idle minutes are `tests/data/piston_still_4_min.jsonl`)
+
+Break detection on: peak **473.9 kN**; `#B27` and the automatic Cancel; the load held at ~370 kN; the
+operator's STOP 13 s later released it (370 → 1.4 kN in 4 s) and the piston sank; the next STOP
+stopped the sinking — as step 33. STOP pressed twice without load also sank the piston (−8 to −12
+mm/min), and once more stopped it. Two keypad STOPs during the session were answered as designed.
+
 ### After a break, a second Cancel releases the load, 2026-10-20, `captures/20261020_112855_step33_second_cancel_releases_after_break.jsonl`
 
 Control mode, break detection on (10 ‰), Path 2 mm/min, a cube that failed gradually: peak **533.8

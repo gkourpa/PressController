@@ -63,6 +63,7 @@ the monitor decides is tested on real captures in `tests/data`:
 | --- | --- |
 | `real_test_10mm_min.jsonl` | step 15: Proteus start-up, a 150 mm cube to failure (1515.88 kN), the ramp sent with start 0, Stop, Cancel, keypad STOP, shut-down |
 | `ramp_6mm_min.jsonl` | step 16: a cancelled START, then a 6 mm/min ramp sent with the real start, stopped at ~570 kN |
+| `piston_still_4_min.jsonl` | 2026-10-20: four idle minutes in control mode — the piston still, the Path reading's noise that the piston label must not take for movement |
 | `dryrun_start_cancel.jsonl` | step 13: START without a specimen, Cancel during the approach |
 
 The offscreen platform has no fonts, so text renders as boxes: UI tests check
