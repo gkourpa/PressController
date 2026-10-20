@@ -121,12 +121,15 @@ class MainWindow(QMainWindow):
             grid.addWidget(head, row, 0, Qt.AlignmentFlag.AlignTop)
             grid.addWidget(lbl, row, 1)
         grid.setColumnStretch(1, 1)
+        grid.setRowStretch(5, 1)        # the card's spare height under its rows
 
         # ---- gauges --------------------------------------------------------
         self.gauges: dict[int, Gauge] = {}
         left = QVBoxLayout()
         left.setContentsMargins(0, 0, 0, 0)
-        left.addWidget(island(status))
+        # The status card takes the column's spare height, so the column
+        # fills the window (operator, 2026-10-20); the gauges keep theirs.
+        left.addWidget(island(status), 1)
         for ch in press.channels:
             g = Gauge()
             g.set_caption(ch.name)
@@ -139,7 +142,6 @@ class MainWindow(QMainWindow):
         if force is not None:
             self.peak_gauge.reading.fit_for(_template(force.range, force.decimals, force.unit))
         left.addWidget(self.peak_gauge)
-        left.addStretch(1)
         left_w = QWidget()
         left_w.setLayout(left)
         left_w.setFixedWidth(LEFT_WIDTH)
@@ -186,7 +188,9 @@ class MainWindow(QMainWindow):
         quit_ = QAction("Quit", self)
         quit_.triggered.connect(self.close)
         self.settings_action = QAction("Settings…", self)
-        self.settings_action.triggered.connect(self.open_settings)
+        # Not connected directly: triggered passes its checked flag (False), which
+        # open_settings would take for the tab -- and the dialog never opened.
+        self.settings_action.triggered.connect(lambda: self.open_settings())
         menu = self.menuBar().addMenu("File")
         menu.addAction(save)
         menu.addAction(open_dir)

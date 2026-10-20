@@ -2,6 +2,18 @@
 
 What each version added or changed, newest first.
 
+## Unreleased
+
+### Fixed
+
+- File → Settings… did nothing (the menu passed its checked flag as the tab
+  name); found on the press PC with 0.1.0.
+
+### Changed
+
+- The status card takes the left column's spare height, so the column fills
+  the window.
+
 ## 0.1.0 — 2026-10-20
 
 The first installer. Control mode runs tests on the press without Proteus.

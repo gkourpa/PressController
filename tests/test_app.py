@@ -402,3 +402,33 @@ def test_the_settings_dialog_chooses_the_data_folder(qapp, tmp_path):
     dlg._accept()
     assert saved[-1].data_dir == str(tmp_path)
     assert saved[-1].press_file == "C:/lab/press.toml"
+
+
+def test_file_settings_opens_the_dialog_at_general(qapp, press, monkeypatch):
+    """The menu's triggered passes its checked flag; on the press PC (0.1.0)
+    open_settings took it for the tab and the dialog never opened."""
+    from presscontroller.app.settings_dialog import SettingsDialog
+    opened = []
+    monkeypatch.setattr(SettingsDialog, "exec",
+                        lambda self: opened.append(self.tabs.tabText(self.tabs.currentIndex())))
+    win = _window(qapp, press, until=1.0)
+    try:
+        win.settings_action.trigger()
+        assert opened == ["General"]
+    finally:
+        win.close()
+
+
+def test_the_left_column_fills_the_height(qapp, press):
+    """The status card takes the spare height (operator, 2026-10-20)."""
+    win = _window(qapp, press, until=1.0)
+    try:
+        win.resize(1900, 1000)
+        qapp.processEvents()
+        status = win.link_lbl.parentWidget().parentWidget()      # the card
+        bottom = win.peak_gauge.mapTo(win, win.peak_gauge.rect().bottomLeft()).y()
+        plot = win.plot_view.mapTo(win, win.plot_view.rect().bottomLeft()).y()
+        assert status.height() > 300
+        assert abs(bottom - plot) < 80          # the column ends near where the plot ends
+    finally:
+        win.close()
