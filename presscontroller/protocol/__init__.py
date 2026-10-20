@@ -9,6 +9,7 @@ from presscontroller.protocol.lines import CTRL_TO_PC, DIRECTIONS, PC_TO_CTRL, L
 from presscontroller.protocol.messages import (
     DECODED_RAMP_CHANNELS,
     Ack,
+    BreakThreshold,
     Command,
     Message,
     Ramp,
@@ -22,7 +23,7 @@ from presscontroller.protocol.messages import (
 )
 
 __all__ = [
-    "Ack", "CTRL_TO_PC", "DECODED_RAMP_CHANNELS", "Command", "DIRECTIONS", "LineAssembler", "Message",
+    "Ack", "BreakThreshold", "CTRL_TO_PC", "DECODED_RAMP_CHANNELS", "Command", "DIRECTIONS", "LineAssembler", "Message",
     "PC_TO_CTRL", "Ramp", "Reply", "Sample", "SetParam", "Unknown", "describe",
     "parse", "rate_text",
 ]

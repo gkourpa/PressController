@@ -11,6 +11,7 @@ line                    from        message
 ``#B<nn>``              either      :class:`Command` — a numbered command or event
 ``#D0<p><v>``           PC          :class:`SetParam` — one digit of parameter, value
 ``#D12<v>;<a>;<b>;…``   PC          :class:`Ramp` — the main test's definition
+``#D21<n>``             PC          :class:`BreakThreshold` — after break detection on
 anything else           either      :class:`Unknown`, kept verbatim
 ======================  ==========  ===============================================
 
@@ -119,13 +120,30 @@ class Ramp:
 
 
 @dataclass(frozen=True)
+class BreakThreshold:
+    """``#D21<n>`` from the PC: the template's break threshold × 10.
+
+    Proteus sends it right after ``#B33`` when its template's "Break
+    identification (Servo)" is ticked: 10 ‰ → ``#D21100``, 25 ‰ → ``#D21250``
+    (step 26). That it is the threshold Proteus was given is confirmed; what the
+    controller does with it is not yet seen.
+    """
+
+    value: int
+
+    @property
+    def per_mil(self) -> float:
+        return self.value / 10.0
+
+
+@dataclass(frozen=True)
 class Unknown:
     """A line no rule here covers, kept exactly as it arrived."""
 
     text: str
 
 
-Message = Sample | Reply | Ack | Command | SetParam | Ramp | Unknown
+Message = Sample | Reply | Ack | Command | SetParam | Ramp | BreakThreshold | Unknown
 
 #: The ramp channels whose units are confirmed: 0 (Force, N and N/s) and 1 (Path,
 #: µm and µm/s). A ramp on any other channel is kept, but its numbers are not read
@@ -149,6 +167,7 @@ _REPLY = re.compile(r"#D1(.*)")
 _COMMAND = re.compile(r"#B(\d\d)")
 _RAMP = re.compile(r"#D12(\d+);(-?\d+);(-?\d+);(-?\d+);(-?\d+)")
 _PARAM = re.compile(r"#D0(\d)(\d+)")
+_BREAK_THRESHOLD = re.compile(r"#D21(\d+)")
 
 
 def parse(direction: str, text: str) -> Message:
@@ -173,6 +192,8 @@ def parse(direction: str, text: str) -> Message:
             return Ramp(*(int(g) for g in m.groups()))
         if m := _PARAM.fullmatch(text):
             return SetParam(int(m[1]), int(m[2]))
+        if m := _BREAK_THRESHOLD.fullmatch(text):
+            return BreakThreshold(int(m[1]))
     return Unknown(text)
 
 
@@ -255,6 +276,8 @@ def describe(direction: str, msg: Message, units: dict[int, str] | None = None) 
                         f"{msg.start}, end {msg.end} (units not decoded for this channel)")
             return (f"ramp on channel {msg.channel}: {rate_text(msg.rate, unit)} from "
                     f"{msg.start_value:g} to {msg.end_value:g} {unit}")
+        case BreakThreshold():
+            return f"break threshold {msg.per_mil:g} ‰"
         case Sample():
             return "measurement"
         case Unknown():

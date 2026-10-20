@@ -8,6 +8,7 @@ from presscontroller.protocol import (
     CTRL_TO_PC,
     PC_TO_CTRL,
     Ack,
+    BreakThreshold,
     Command,
     LineAssembler,
     Ramp,
@@ -74,6 +75,8 @@ def test_controller_lines(text, msg):
     ("#D0910", SetParam(9, 10)),
     ("#D12167;0;100000;0;1", Ramp(167, 0, 100000, 0, 1)),
     ("#D12100;79446;100000;0;1", Ramp(100, 79446, 100000, 0, 1)),
+    ("#D21100", BreakThreshold(100)),
+    ("#D21250", BreakThreshold(250)),
 ])
 def test_pc_lines(text, msg):
     assert parse(PC_TO_CTRL, text) == msg
@@ -122,3 +125,9 @@ def test_descriptions_mark_a_guess_with_a_question_mark():
     assert describe(CTRL_TO_PC, Command(1)) == "start load reached"
     assert describe(PC_TO_CTRL, Command(99)) == "unknown command"
     assert describe(PC_TO_CTRL, SetParam(5, 20)) == "stream interval 200 ms"
+
+
+def test_the_break_threshold_is_the_templates_value_times_ten():
+    # Step 26: Proteus' template at 10 and at 25 per mil.
+    assert BreakThreshold(100).per_mil == 10.0
+    assert describe(PC_TO_CTRL, BreakThreshold(250)) == "break threshold 25 ‰"

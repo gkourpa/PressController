@@ -318,6 +318,18 @@ Operator procedure after a test: exit the test in Proteus, then press **STOP on 
   Proteus showed 0.0. → **Zero is a software tare inside Proteus.** A replacement app must do its own
   tare (subtract the raw value at the moment of zeroing).
 
+### Break identification on, 2026-10-20, `captures/20261020_101100_step26_break_threshold_10_25.jsonl`
+
+The template's **Break identification (Servo)** ticked, threshold 10 ‰, then 25 ‰; each time START
+without a specimen and Cancel after the start load. Proteus sent at START:
+
+`#B47` `#O` `#B30` **`#B33` `#D21100`** `#D0910` `#B23` (10 ‰) and the same with **`#D21250`** (25 ‰).
+
+So `#D21<n>` is the threshold × 10, sent right after break detection on, before the start load. The
+controller answered neither. Both approaches ended against something at **67.1 mm**: `#B01` at 3.4 and
+3.6 kN, the force overshooting to **19.7 kN** within 2 s and settling at ~11.7 kN until Cancel —
+the "20 kN" the operator sees at the start load is this overshoot, not a setting.
+
 ### Control mode: this program in Proteus' place, 2026-10-19, `captures/20261019_174926_step24_control_connect.jsonl`, `…175412_step25_control_connect_again.jsonl`
 
 The old PC unplugged; the controller cable straight into a Digitus adapter (COM7). This program sent
@@ -418,7 +430,7 @@ validity question and "keep measuring" send nothing.
 | `#B24` `#B34` `#B38` `#B60` `#D160` `#D161` | PC | in Proteus' program, never seen on the line (see above) | unknown — never to be sent |
 | `#D05<n>` | PC | stream interval n × 10 ms — the template's ramp "Measur. dist." (200 ms → `#D0520`) | confirmed |
 | `#D09<n>` | PC | start load, n × 0.01 % of the force range (template "Start load 0.1000 %" → `#D0910` = 4 kN; `#B01` came at 3–4 kN in every test) | hypothesis, strongly supported |
-| `#D21<n>` | PC | break threshold, n × 0.1 ‰, sent after `#B33` when the template's break identification is on (program; never recorded) | unknown — not sent until recorded |
+| `#D21<n>` | PC | break threshold, n × 0.1 ‰, sent right after `#B33` when the template's break identification is on | encoding confirmed (step 26: 10 ‰ → `#D21100`, 25 ‰ → `#D21250`); its effect on the controller not yet seen |
 | `#D12…` | PC | ramp: speed; start; end; 0; channel, in thousandths of the channel unit | confirmed for Path and Force |
 | `#B03 #B09 #B40 #B41 #B50–52 #D020` | PC | start-up / approach, replayed as recorded | unknown, accepted |
 

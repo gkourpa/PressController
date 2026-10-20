@@ -26,7 +26,7 @@ sequence of elements. Each one, what it holds, and what it sends:
 | Element | Setting (lab's value) | Sends | Status |
 | --- | --- | --- | --- |
 | Peak | checkbox (off) | `#B30` off / `#B31` on, at START | confirmed — the recordings send `#B30` |
-| Break identification (Servo) | checkbox (off), threshold **10.00 ‰** | off: `#B32`. On: `#B33` then **`#D21<threshold × 10>`** (`#D21100` for 10 ‰) | `#B32` confirmed; the on-path read from Proteus' program, **never recorded** |
+| Break identification (Servo) | checkbox (off), threshold **10.00 ‰** | off: `#B32`. On: `#B33` then **`#D21<threshold × 10>`** | **confirmed** (step 26: 10 ‰ → `#D21100`, 25 ‰ → `#D21250`) |
 | Start | start load **0.1000 % of range** | **`#D09<start load × 100>`**: `#D0910` = 0.10 % of 4000 kN = 4 kN | matches `#B01` at 3–4 kN in every test |
 | Adjustment | "Automatic" (off) | nothing seen (zeroing an extensometer) | — |
 | The test is successful | "Validity inquiry" (on) | nothing: a question Proteus asks the operator after the test | software only |
@@ -42,7 +42,7 @@ dialog edits it; every value is checked when read and when entered.
 | --- | --- | --- |
 | Peak | off | `#B30` / `#B31` |
 | Break detection | **on** (operator) | `#B32` / `#B33` |
-| Break threshold | 10.00 ‰ | `#D21…` — **only after it is recorded** (see below) |
+| Break threshold | 10.0 ‰ | `#D21…`, right after `#B33` |
 | Start load | 0.10 % of the force range (4 kN) | `#D09…` |
 | Ramp: control | Path | channel `1` / `0` |
 | Ramp: speed | 2 mm/min (Path), 2 kN/s (Force) | in the ramp |
@@ -72,18 +72,9 @@ point:**
 | `#D12<speed>;0;<end>;0;<channel>` | channel `1` (Path) or `0` (Force), never Deformation; speed above 0 and **at most the press file's `[limits]`** (10 mm/min, 15 kN/s); end above 0 and within the channel's range; start always `0` (it does not change the speed — steps 17–19) |
 | `#D09<n>` | start load 0.01–1.00 % of the force range (n = 1–100); 0.10 % = Proteus' |
 | `#D05<n>` | measuring interval 50–1000 ms in 10 ms steps (n = 5–100); 100 ms (`#D0510`) and 200 ms (`#D0520`) are recorded |
-| `#D21<n>` | **not yet** — waits for the recording below |
+| `#D21<n>` | break threshold 1.0–100.0 ‰ in 0.1 ‰ steps (n = 10–1000), sent only right after `#B33`; 10 ‰ and 25 ‰ are recorded |
 
 Anything else is refused before a byte is written.
-
-## The break threshold — one recording first
-
-Proteus never had break identification enabled here, so `#B33 #D21…` has never
-been on the line. Before this program sends `#D21`, record Proteus doing it:
-old PC and tap as before; in the template tick **Break identification (Servo)**
-(threshold 10.00 ‰); START without a specimen, Cancel during the approach (as
-step 13). Until then, with break detection on, the controller uses whatever
-threshold it holds.
 
 ## The buttons, state by state
 
@@ -97,7 +88,8 @@ threshold it holds.
 | ramp end (`#B02`) | answered automatically: `#B26 #B17` → idle | | | |
 
 - START sends `#B47`, waits for `#O`, then Peak and Break detection as the
-  switches show, `#D09…`, `#B23`.
+  switches show (`#B33` followed by `#D21…`), `#D09…`, `#B23` — Proteus' order
+  (step 26).
 - **STOP is always `#B17`** (Proteus' Cancel: pump off, load released), large,
   red, and also on the **Esc** key. PAUSE is labelled as not a stop.
 - START shows the ramp it will send in words ("Path 2 mm/min to 100 mm").
