@@ -55,6 +55,10 @@ off and PC mode off, as Proteus does when it exits.
   can go wrong: an answer that does not come, a controller line no recording
   explains (it may be how the controller tells a break), the readings stopping,
   Disconnect or closing during a test. The keypad STOP is answered as before.
+* **A break** (``#B27``, break detection on): the controller then holds the
+  load, and Cancel does not release it (step 32). The session sends Cancel,
+  hands the keypad back, and tells the operator to press the keypad STOP — what
+  released the load at the press.
 """
 
 from __future__ import annotations
@@ -340,7 +344,16 @@ class ControllerSession:
                           "STOP (or Esc) stops the pump.")
             return
         if isinstance(msg, Command) and msg.code == 27:
-            self._stop_for("the controller reported a break (#B27)")
+            # Step 32: after a break the controller holds the load; Cancel
+            # stops the pump but does not release it. The keypad STOP did, once
+            # PC mode was off — so: Cancel, hand the keypad back, and say so.
+            self.link.send(cmd.CANCEL)
+            self._send_all(cmd.DISCONNECT)
+            self._end_test()
+            self.state = SessionState.IDLE
+            self._say("The controller reported a break (#B27): pump off, and the keypad is in "
+                      "charge again. The load may still be held — press STOP on the "
+                      "controller's keypad to release it.", "error")
             return
         if not isinstance(msg, Command) or msg.code not in EXPLAINED_EVENTS:
             self._stop_for(f"the controller said {ev.text!r}, which no recording explains "

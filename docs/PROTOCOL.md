@@ -371,6 +371,23 @@ Proteus' path ramps under load, for comparison: 10 mm/min ran at 2.23 (step 15, 
 3 at 2.33 (step 17), 2 at 2.09 (23), 1 at 1.11 (18); step 19 ran 10 at 9.77 on a specimen that hardly
 loaded. Whether the press also has a ceiling near 2.3 mm/min under load (step 17) is open.
 
+### A cube to failure with break detection on, 2026-10-20, `captures/20261020_111756_step32_cube_to_failure_break_detection_on.jsonl`
+
+Control mode, break detection on (10 ‰), Path 2 mm/min (ran at 2.07 mm/min, 12 kN/s), a fresh 150 mm
+cube. **Peak 1908.9 kN**; the force fell to 1879 kN over a second, then the controller sent **`#B27`**
+(confirmed as the break report: it came at the failure); control mode answered `#B17` 50 ms later;
+the controller answered **`#B43` at once** (80 ms — after an ordinary Cancel it comes ~20 s later,
+once the load is down). **The pump stopped, but the load stayed: ~1528 kN, the piston still, for
+30 s**, until the operator closed the program (`#B36` `#B21`) and pressed **STOP on the keypad — which
+released it**. Compare step 15 (break detection off): Cancel took the load from 986 to 3 kN in 2 s.
+
+Proteus' program does not send anything itself on a break: its handler records the state and tells
+its test window "sample broken". Its manual says the machine unloads by itself at a break — not
+what happened here; whether the immediate `#B17` stopped an unloading the controller had begun is
+not known. What is known to release the load after a break: PC mode off, then the keypad STOP.
+Control mode now does the first part by itself on `#B27` and tells the operator to press the keypad
+STOP.
+
 ### Ramp end and keypad STOP from control mode, 2026-10-20, `captures/20261020_110938_step31_force_ramp_end_and_keypad_stop.jsonl`
 
 Control mode, Force 2 kN/s to 100 kN, break detection on, a specimen at 67.1 mm.
@@ -500,7 +517,7 @@ validity question and "keep measuring" send nothing.
 |---|---|---|---|
 | `#B01` | CTRL | start load reached | confirmed |
 | `#B02` | CTRL | ramp end reached (force ramp at its end force) | confirmed (step 21) |
-| `#B27` | CTRL | break detected: with break detection on, the force fell by the threshold (10 ‰ of range = 40 kN) from its peak | hypothesis (steps 27, 29, 31: only with break detection on, after a load fell) |
+| `#B27` | CTRL | break detected (break detection on): the force fell by the threshold from its peak. After it the controller holds the load; Cancel stops the pump but does not release it — PC mode off and the keypad STOP do | confirmed at a cube's failure (step 32; also steps 27, 29, 31 after a STOP) |
 | text lines (`DATE`, `IDENT`, … `BREAK`, `DEFORM`) | CTRL | the controller's own test report, sent on leaving PC mode during a test | seen once (step 31) |
 | `#B28` | CTRL | keypad STOP pressed (in PC mode, not obeyed locally) | confirmed |
 | `#B35` | CTRL | answer to the ramp definition | hypothesis |
@@ -558,7 +575,7 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 - Whether a path ramp under load is limited near 2.3 mm/min (step 17: 3 set, 2.33 measured).
 - What limits a path ramp under load to about 2.3 mm/min (steps 15, 17); step 19 ran 10 mm/min without load.
 - Ramp field 4 (`0`) and whether field 5 changes with Force/Deformation control.
-- Whether `#B27` (step 27) is the break report at a real failure, and whether the controller stops the pump by itself on it.
+- After a break (`#B27`), whether the controller would unload by itself if not sent `#B17`, and what Proteus does — a Proteus recording with break identification on, to failure, would show both.
 - Whether other keypad keys (START, ZERO, PEAK…) are forwarded like STOP (`#B28`) in PC mode.
 - Meaning of `#D0910`, controller `#B35`, `#B43`; what the `8` after `#D0` is.
 - What `#B34`, `#B38` and `#B60` do (in Proteus' program, never seen on the line).

@@ -96,10 +96,11 @@ Anything else is refused before a byte is written.
   2026-10-20).
 - START shows the ramp it will send in words ("Path 2 mm/min to 100 mm").
 - With break detection on, **the controller reports a break as `#B27`**
-  (hypothesis, step 27: it came as the force fell 40 kN — the 10 ‰ threshold of
-  the range — after a STOP). During a test it is answered with STOP; so is any
-  other controller line no recording explains. Step 5 below confirms it at a
-  real failure.
+  (confirmed at a cube's failure, step 32) — and then **holds the load**: Cancel
+  stops the pump but does not release it. The keypad STOP releases it once PC
+  mode is off. So on `#B27` the session sends `#B17`, hands the keypad back
+  (`#B36 #B21`), and tells the operator, in red, to press STOP on the keypad.
+  Any other controller line no recording explains is answered with STOP.
 
 ## When something goes wrong — every case ends in `#B17`
 
@@ -134,8 +135,9 @@ following our own test as it follows Proteus'.
 4. **Keypad STOP** during a ramp → pump off, keypad in charge.
 Steps 1–4 done on 2026-10-20 (steps 27–31 in docs/PROTOCOL.md).
 
-5. **A cube to failure, break detection ON**: watch what the controller does
-   and sends at the break; the operator ready on STOP.
+5. **A cube to failure, break detection ON**: done (step 32) — peak 1908.9 kN,
+   `#B27` at the break; the load stayed held after Cancel until PC mode was off
+   and the keypad STOP pressed. Handled since as above.
 
 Each step is recorded and checked against Proteus' recording of the same thing
 before the next.
