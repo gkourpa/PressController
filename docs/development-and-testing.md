@@ -70,6 +70,32 @@ The offscreen platform has no fonts, so text renders as boxes: UI tests check
 text and state, never pixels. For a readable offscreen screenshot set
 `$env:QT_QPA_FONTDIR = "C:\Windows\Fonts"` and the application font to Segoe UI.
 
+## Frozen Windows build and installer
+
+```powershell
+.venv\Scripts\python -m pip install pyinstaller==6.22.3   # once; a build tool, not a runtime pin
+.venv\Scripts\python tools/build_installer.py
+```
+
+runs PyInstaller (`PressController.spec`, onedir, at `dist/PressController/`)
+and then Inno Setup 6 (`installer/PressController.iss`; `winget install
+JRSoftware.InnoSetup`), producing `dist/installer/PressController-<version>-setup.exe`
+— DAqReader's arrangement. The Start menu gets **PressController** (control
+mode, `--control`) and **PressController monitor (listen-only)**.
+
+- **Upgrades in place** (fixed AppId) and replaces `_internal` wholesale.
+- **Never touches** `%APPDATA%\PressController` (the settings) or the operator's
+  press file, captures and tests; **no `*.toml` is packaged** — a press file is
+  one lab's, copied to a new PC by hand.
+- **Refuses to build from uncommitted changes**, so a setup's number always
+  names one commit.
+
+### Versioning
+
+The version is `presscontroller/__init__.py`'s `__version__` and nothing else.
+**Every build handed out bumps it first** (edit, commit, then build), so no two
+setups of one number differ. 0.1.0 (2026-10-20) is the first installer.
+
 ## The tap
 
 Wiring, parts and the checks before connecting to the press are in

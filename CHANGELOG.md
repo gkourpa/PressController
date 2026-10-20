@@ -2,7 +2,9 @@
 
 What each version added or changed, newest first.
 
-## Unreleased
+## 0.1.0 — 2026-10-20
+
+The first installer. Control mode runs tests on the press without Proteus.
 
 ### Added
 
@@ -24,6 +26,13 @@ What each version added or changed, newest first.
   Peak and Break detection switches are remembered, never reset.
 - `tools/proteus_cd.py`: reads Proteus' installation CD as data and lists the
   commands it sends.
+- At a break (break detection on) the program stops the pump and says to press
+  STOP again to release the load; "Piston: going down / still / going up" in the
+  test bar.
+- Settings in tabs: theme (system, light, dark), auto-connect, the plot's axis
+  ranges and colour. The window opens as it was left (size, position,
+  maximized, full screen with F11).
+- The app icon, and a Windows installer (`tools/build_installer.py`).
 
 ### Changed
 

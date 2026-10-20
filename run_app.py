@@ -1,4 +1,6 @@
-"""Launch the PressController monitor: ``python run_app.py`` (same as ``python -m presscontroller.app``)."""
+"""Launch PressController: ``python run_app.py [--control]`` (same as ``python -m presscontroller.app``).
+
+Also the frozen build's entry point (PressController.spec)."""
 
 import sys
 
