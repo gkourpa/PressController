@@ -164,6 +164,7 @@ class ControllerSession:
         """The running test's lines; ``None`` between tests."""
         self._await = ""
         self._test_deadline = 0.0
+        self._carry: list[TapEvent] = []
 
     # ---- the source surface the window drives --------------------------------
 
@@ -359,15 +360,33 @@ class ControllerSession:
     # ---- the tick ------------------------------------------------------------
 
     def poll(self) -> list[TapEvent]:
-        events = self.link.poll()
-        now = self._clock()
-        for ev in events:
-            if ev.direction == CTRL_TO_PC:
-                self._heard(ev, now)
-        self._advance(now)
-        # The lines sent while advancing are heard on the next poll; hand out
-        # what is already there so nothing waits a tick for no reason.
-        return events + self.link.poll()
+        """Every line since the last poll — each controller line through the
+        session's own checks first, then handed out.
+
+        Advancing sends lines, and a write can take tens of milliseconds over
+        USB; the controller may answer meanwhile. So after advancing the link is
+        polled again and **whatever came is heard too**, until nothing new is
+        waiting. (It once was only handed out: the controller's ``#D138.6``,
+        arriving while ``#B40`` was written, never reached the start-up check,
+        which then aborted — 2026-10-20.)
+        """
+        out: list[TapEvent] = []
+        events, self._carry = self._carry + self.link.poll(), []
+        for _ in range(20):
+            now = self._clock()
+            for ev in events:
+                if ev.direction == CTRL_TO_PC:
+                    self._heard(ev, now)
+            out += events
+            self._advance(now)
+            events = self.link.poll()
+            if not events:
+                break
+        else:
+            # Twenty rounds without the queue running dry: hear the rest on the
+            # next poll rather than spin here.
+            self._carry = events
+        return out
 
     def _heard(self, ev: TapEvent, now: float) -> None:
         msg = parse(ev.direction, ev.text)

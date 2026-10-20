@@ -27,9 +27,19 @@ def test_a_line_split_across_reads_is_whole_and_stamped_at_its_first_byte():
     a = LineAssembler(CTRL_TO_PC)
     assert a.feed(b"#D0819630;0;-12", 1.0) == []
     assert a.pending == b"#D0819630;0;-12"
-    assert a.feed(b"46;1;15859;2;-25637\r\n#O\r", 1.03) == [
+    assert a.feed(b"46;1;15859;2;-25637\r\n#O", 1.03) == [
         (1.0, "#D0819630;0;-1246;1;15859;2;-25637")]
-    assert a.feed(b"\n", 1.05) == [(1.03, "#O")]
+    assert a.feed(b"\r\n", 1.05) == [(1.03, "#O")]
+
+
+def test_a_reply_split_around_a_measurement_line_is_two_lines():
+    # 2026-10-20, 11:04: the controller sent #O's CR, a whole stream line, then
+    # #O's LF. Read as ending only at CR LF, it was one unknown line.
+    a = LineAssembler(CTRL_TO_PC)
+    raw = b"23\r\n#O\r#D088002;0;17;1;383043;2;-26327\r\n\n#D088"
+    assert [text for _, text in a.feed(raw, 2.0)] == [
+        "23", "#O", "#D088002;0;17;1;383043;2;-26327"]
+    assert a.pending == b"#D088"
 
 
 def test_two_lines_in_one_read():

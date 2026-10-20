@@ -370,3 +370,17 @@ def test_a_break_reported_after_stop_changes_nothing(limits):
         assert fake.written.count("#B17") == 1 and s.state is SessionState.CONNECTED
     finally:
         s.close()
+
+
+def test_start_survives_the_controller_splitting_its_answer_around_a_reading(limits):
+    # 2026-10-20, 11:04: "#O" CR, a stream line, then LF, in answer to START.
+    answers = dict(FakeController().answers,
+                   **{"#B47": "#O\r#D088002;0;17;1;383043;2;-26327\r\n"})
+    fake = FakeController(answers=answers)
+    s = _connected(fake, limits)
+    try:
+        s.start_test(PATH_2_TO_100)
+        _run(s, lambda s: s.test in (RunPhase.APPROACH, RunPhase.NONE))
+        assert s.test is RunPhase.APPROACH and "#B17" not in _after_startup(fake)
+    finally:
+        s.close()

@@ -371,6 +371,22 @@ Proteus' path ramps under load, for comparison: 10 mm/min ran at 2.23 (step 15, 
 3 at 2.33 (step 17), 2 at 2.09 (23), 1 at 1.11 (18); step 19 ran 10 at 9.77 on a specimen that hardly
 loaded. Whether the press also has a ceiling near 2.3 mm/min under load (step 17) is open.
 
+### Two program bugs, failing safe, 2026-10-20, `captures/20261020_110322_step30_split_reply_and_connect_race.jsonl`
+
+- **Connect aborted** after a correct start-up answer: `#B40` took 60 ms to write over USB, the
+  controller's `#D138.6` (to `#B50`) arrived meanwhile and was handed to the window but not to the
+  session's start-up check, which saw only `#D104000` and aborted. Fixed: every controller line passes
+  the session's checks.
+- **START stopped at once**: the controller answered `#B47` with `#O` **CR, then a whole measurement
+  line, then `#O`'s LF** — `#O#D088002;…
+
+`. Read as ending only at CR LF, that was one unknown
+  line, and the session stopped the test (`#B17`) before the approach. **The controller can put a
+  stream line between a reply's CR and LF**; seen once in all recordings. Fixed: a line ends at CR or
+  LF, whichever comes first, and an empty line is no line.
+
+Nothing moved in either case.
+
 ### Control mode: this program in Proteus' place, 2026-10-19, `captures/20261019_174926_step24_control_connect.jsonl`, `…175412_step25_control_connect_again.jsonl`
 
 The old PC unplugged; the controller cable straight into a Digitus adapter (COM7). This program sent

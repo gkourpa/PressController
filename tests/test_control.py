@@ -275,3 +275,17 @@ def test_the_monitor_window_does_not_load_the_control_package():
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
                          env=dict(os.environ, QT_QPA_PLATFORM="offscreen"), check=True)
     assert out.stdout.strip() == "False"
+
+
+def test_an_answer_that_arrives_while_the_next_line_is_written_is_still_checked():
+    # 2026-10-20, 11:03: #B40 took 60 ms to write; #D138.6 (the answer to #B50)
+    # arrived meanwhile and never reached the start-up check, which aborted.
+    fake = FakeController(write_s=0.06)
+    s = _session(fake)
+    try:
+        s.connect()
+        _run(s, lambda s: s.state in (SessionState.CONNECTED, SessionState.FAILED))
+        assert s.state is SessionState.CONNECTED, s.pop_messages()
+        assert s.replies == ["#O", "#D138.6", "#D104000", "#D140", "#D180"]
+    finally:
+        s.close()

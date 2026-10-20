@@ -23,7 +23,7 @@ ANSWERS = {"#B20": "#O", "#B50": "#D138.6", "#B40": "#D104000", "#B51": "#D140",
 class FakeController:
     def __init__(self, *, interval_s: float = 0.05, answers: dict[str, str] | None = None,
                  busy: bool = False, approach_s: float = 0.1, ramp_s: float | None = None,
-                 released_s: float = 0.2):
+                 released_s: float = 0.2, write_s: float = 0.0):
         self.answers = dict(ANSWERS if answers is None else answers)
         self.interval_s = interval_s
         self.approach_s = approach_s
@@ -31,6 +31,8 @@ class FakeController:
         self.ramp_s = ramp_s
         """Seconds of ramp before ``#B02``; ``None`` — the ramp never ends."""
         self.released_s = released_s
+        self.write_s = write_s
+        """Seconds each write takes, as a USB adapter's can (60 ms seen)."""
         self.written: list[str] = []
         self.pc_mode = False
         self.streaming = busy          # a "busy" line is one another PC is already streaming
@@ -97,6 +99,8 @@ class FakeController:
         return b""
 
     def write(self, data: bytes) -> int:
+        if self.write_s:
+            time.sleep(self.write_s)
         self._buf += data
         while b"\r\n" in self._buf:
             raw, self._buf = self._buf.split(b"\r\n", 1)
