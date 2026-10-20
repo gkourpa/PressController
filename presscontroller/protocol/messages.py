@@ -221,7 +221,7 @@ COMMANDS: dict[tuple[str, int], Meaning] = {
 PARAMS: dict[int, Meaning] = {
     2: Meaning("start-up parameter", False),
     5: Meaning("stream interval (×10 ms)", True),
-    9: Meaning("approach parameter", False),
+    9: Meaning("start load (×0.01 % of the force range)", False),
 }
 
 

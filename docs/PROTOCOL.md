@@ -385,6 +385,17 @@ state). They match the phases decoded from the line.
 translation) describe the same buttons, START → approach → "Weiterfahren" (continue) → load, and
 nothing that lowers the piston.
 
+## Proteus' test template (operator's video, 2026-10-20)
+
+The lab's template is a sequence of elements — Peak, Break identification (Servo),
+Start, Adjustment, The test is successful, Ramp, End test. What each holds and
+sends is tabled in [motion](motion.md#proteus-test-template-element-by-element-operators-video-2026-10-20).
+In short: Peak's checkbox (off) is the `#B30` at START; Break identification's
+checkbox (off) is the `#B32`, and when on Proteus' program sends `#B33` then
+`#D21<threshold × 10>` (threshold 10.00 ‰); Start's "start load 0.1000 % of range"
+is `#D0910`; the Ramp's "Measur. dist. 200 ms" is `#D0520`; Adjustment, the
+validity question and "keep measuring" send nothing.
+
 ## Command summary
 
 | Code | From | Meaning | Status |
@@ -405,9 +416,11 @@ nothing that lowers the piston.
 | `#B36` / `#B37` | PC | stream off / on | confirmed |
 | `#B47` | PC | START pressed (arm the test) | confirmed (Proteus' START handler sends it; the approach follows) |
 | `#B24` `#B34` `#B38` `#B60` `#D160` `#D161` | PC | in Proteus' program, never seen on the line (see above) | unknown — never to be sent |
-| `#D05<n>` | PC | stream interval n × 10 ms | confirmed |
+| `#D05<n>` | PC | stream interval n × 10 ms — the template's ramp "Measur. dist." (200 ms → `#D0520`) | confirmed |
+| `#D09<n>` | PC | start load, n × 0.01 % of the force range (template "Start load 0.1000 %" → `#D0910` = 4 kN; `#B01` came at 3–4 kN in every test) | hypothesis, strongly supported |
+| `#D21<n>` | PC | break threshold, n × 0.1 ‰, sent after `#B33` when the template's break identification is on (program; never recorded) | unknown — not sent until recorded |
 | `#D12…` | PC | ramp: speed; start; end; 0; channel, in thousandths of the channel unit | confirmed for Path and Force |
-| `#B03 #B09 #B40 #B41 #B50–52 #D020 #D0910` | PC | start-up / approach, replayed as recorded | unknown, accepted |
+| `#B03 #B09 #B40 #B41 #B50–52 #D020` | PC | start-up / approach, replayed as recorded | unknown, accepted |
 
 ## Controller display indicators
 
