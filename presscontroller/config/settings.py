@@ -24,7 +24,14 @@ import tomllib
 from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
 
-from presscontroller.config.parse import ConfigError, get_bool, get_float, get_int, get_str
+from presscontroller.config.parse import (
+    ConfigError,
+    get_bool,
+    get_float,
+    get_int,
+    get_range,
+    get_str,
+)
 from presscontroller.config.toml import toml_value, write_atomic
 
 APP_DIRNAME = "PressController"
@@ -34,6 +41,15 @@ SETTINGS_ENV = "PRESSCONTROLLER_SETTINGS"
 DEFAULT_REFRESH_HZ = 2.0
 MIN_REFRESH_HZ = 0.2
 MAX_REFRESH_HZ = 20.0
+
+#: What ``theme`` may be (DAqReader's): ``system`` follows Windows' own setting.
+THEMES = ("system", "light", "dark")
+THEME_LABELS = {"system": "System", "light": "Light", "dark": "Dark"}
+DEFAULT_THEME = "system"
+
+#: The force–displacement curve's colour until the operator picks one
+#: (matplotlib's first, which the plot used before it could be chosen).
+DEFAULT_PLOT_COLOUR = "#1f77b4"
 
 #: The ramp's controlled channel, as the settings file names it.
 RAMP_CONTROLS = ("path", "force")
@@ -110,6 +126,16 @@ class TemplateSettings:
 
 
 @dataclass(frozen=True)
+class PlotSettings:
+    """The force–displacement plot: each axis fitted to the data (``None``) or a
+    fixed ``(low, high)``, and the curve's colour — as DAqReader's plots."""
+
+    xlim: tuple[float, float] | None = None
+    ylim: tuple[float, float] | None = None
+    colour: str = DEFAULT_PLOT_COLOUR
+
+
+@dataclass(frozen=True)
 class Settings:
     press_file: str = ""
     """The press file opened last. Blank until the operator picks one."""
@@ -124,9 +150,22 @@ class Settings:
     the press, so it is kept here; blank until set, and then the press file's
     ``[control] port`` is used and remembered here."""
 
+    auto_connect: bool = False
+    """Control mode connects by itself once its window is open — no Connect to
+    press (operator, 2026-10-20). Off until chosen."""
+
     refresh_hz: float = DEFAULT_REFRESH_HZ
     """The window's redraw ceiling (operator, 2026-10-19: no faster than 2 Hz).
     A ceiling, not a target: every line is taken in whatever the screen shows."""
+
+    theme: str = DEFAULT_THEME
+    """``system``, ``light`` or ``dark`` — one of :data:`THEMES`."""
+
+    window_geometry: str = ""
+    """The window's size, position, and whether it was maximized or full screen,
+    as Qt saves it (base64), from the last close — so it opens as it was left."""
+
+    plot: PlotSettings = field(default_factory=PlotSettings)
 
     test: TemplateSettings = field(default_factory=TemplateSettings)
 
@@ -137,7 +176,10 @@ class Settings:
             f"press_file = {toml_value(self.press_file)}",
             f"data_dir = {toml_value(self.data_dir)}",
             f"control_port = {toml_value(self.control_port)}",
+            f"auto_connect = {toml_value(self.auto_connect)}",
             f"refresh_hz = {toml_value(self.refresh_hz)}",
+            f"theme = {toml_value(self.theme)}",
+            f"window_geometry = {toml_value(self.window_geometry)}",
             "",
             "# What control mode sends at START: Proteus' test template, as defaults.",
             "[test]",
@@ -151,6 +193,12 @@ class Settings:
             f"force_speed_kn_s = {toml_value(t.force_speed_kn_s)}",
             f"force_end_kn = {toml_value(t.force_end_kn)}",
             f"measuring_interval_ms = {toml_value(t.measuring_interval_ms)}",
+            "",
+            "# The force-displacement plot. An axis range left out is fitted to the data.",
+            "[plot]",
+            *([f"xlim = {toml_value(list(self.plot.xlim))}"] if self.plot.xlim else []),
+            *([f"ylim = {toml_value(list(self.plot.ylim))}"] if self.plot.ylim else []),
+            f"colour = {toml_value(self.plot.colour)}",
         ]) + "\n"
 
 
@@ -201,6 +249,30 @@ def _read_test(data: dict, where: str) -> tuple[TemplateSettings, list[str]]:
     return test, notes
 
 
+def _read_plot(data: dict, where: str) -> tuple[PlotSettings, list[str]]:
+    """The ``[plot]`` table; an unusable entry falls back to its default, named."""
+    table = data.get("plot", {})
+    if not isinstance(table, dict):
+        return PlotSettings(), [f"{where}: [plot] must be a table; using the defaults"]
+    notes, values = [], {}
+    for key in ("xlim", "ylim"):
+        try:
+            values[key] = get_range(table, key, where)
+        except ConfigError as exc:
+            notes.append(f"{exc}; fitting that axis to the data")
+            values[key] = None
+    try:
+        colour = get_str(table, "colour", DEFAULT_PLOT_COLOUR, where)
+    except ConfigError as exc:
+        notes.append(f"{exc}; using the default colour")
+        colour = DEFAULT_PLOT_COLOUR
+    if not (len(colour) == 7 and colour.startswith("#")
+            and all(c in "0123456789abcdefABCDEF" for c in colour[1:])):
+        notes.append(f"{where}: plot colour {colour!r} is not #rrggbb; using the default")
+        colour = DEFAULT_PLOT_COLOUR
+    return PlotSettings(xlim=values["xlim"], ylim=values["ylim"], colour=colour), notes
+
+
 def load_settings(path: str | Path | None = None) -> tuple[Settings, str | None]:
     """The settings, and what was wrong with the file if anything was.
 
@@ -213,9 +285,20 @@ def load_settings(path: str | Path | None = None) -> tuple[Settings, str | None]
         data = tomllib.loads(path.read_text(encoding="utf-8"))
         where = path.name
         test, notes = _read_test(data, where)
+        plot, plot_notes = _read_plot(data, where)
+        notes += plot_notes
+        theme = get_str(data, "theme", DEFAULT_THEME, where)
+        if theme not in THEMES:
+            notes.append(f"{where}: theme {theme!r} is not one of {', '.join(THEMES)}; "
+                         "following the system")
+            theme = DEFAULT_THEME
         settings = Settings(press_file=get_str(data, "press_file", "", where),
                             data_dir=get_str(data, "data_dir", "", where),
                             control_port=get_str(data, "control_port", "", where).strip(),
+                            auto_connect=get_bool(data, "auto_connect", False, where),
+                            theme=theme,
+                            window_geometry=get_str(data, "window_geometry", "", where),
+                            plot=plot,
                             refresh_hz=clamp_refresh_hz(
                                 get_float(data, "refresh_hz", DEFAULT_REFRESH_HZ, where)),
                             test=test)

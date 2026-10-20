@@ -1,39 +1,51 @@
-"""The settings, in one dialog: the screen, control mode's port, and the test.
+"""The settings, in one dialog of four tabs: General, Connection, Test, Plot.
 
 As DAqReader's settings dialog: it edits the :class:`Settings` it is given, and
 only OK saves (``settings`` holds the result; after Cancel it is what was passed
-in). The **test** part is Proteus' test template — Peak, break identification
-and its threshold, the start load, the ramp and its measuring interval
-(docs/motion.md) — and holds this program's defaults: what the control window's
-switches and ramp start from, and what START sends.
+in). The theme takes effect at once on OK, as DAqReader's does.
+
+* **General** — the theme (system, light, dark) and the screen's redraw ceiling.
+* **Connection** — control mode's port, and whether it connects by itself.
+* **Test** — Proteus' test template (docs/motion.md): Peak, break detection and
+  its threshold, the start load, the ramps and the measuring interval; what the
+  control window's switches and ramp start from, and what START sends.
+* **Plot** — the force–displacement plot's axes (fitted, or a fixed range) and
+  its colour, as DAqReader's plot dialog has them.
 
 Every value is limited to the range a settings file may hold
 (:mod:`presscontroller.config.settings`). The ramp's speed is not limited here:
 the press file's ``[limits]`` are, and START refuses a ramp above them, saying
-so. The dialog says that in visible text rather than a tooltip.
+so — in visible text here, not a tooltip.
 
-The serial ports offered are listed by :meth:`SettingsDialog._ports`, a method so
-a test can stub it; any name may be typed.
+The serial ports offered come from :meth:`SettingsDialog._ports` and the colour
+from :meth:`SettingsDialog._ask_colour`, methods so a test can stub them.
 """
 
 from __future__ import annotations
 
 from dataclasses import replace
 
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
+    QColorDialog,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
-    QGroupBox,
+    QHBoxLayout,
     QLabel,
+    QPushButton,
     QSpinBox,
+    QTabWidget,
     QVBoxLayout,
+    QWidget,
 )
 
-from presscontroller.app.theme import muted, styled
+from presscontroller.app.theme import apply_theme, muted, styled
 from presscontroller.config.settings import (
     MAX_BREAK_THRESHOLD,
     MAX_INTERVAL_MS,
@@ -45,10 +57,19 @@ from presscontroller.config.settings import (
     MIN_START_LOAD,
     RAMP_CONTROL_LABELS,
     RAMP_CONTROLS,
+    THEME_LABELS,
+    THEMES,
+    PlotSettings,
     Settings,
     TemplateSettings,
     save_settings,
 )
+
+#: The tabs, in order, by name — :meth:`SettingsDialog.show_tab` takes these.
+TABS = ("General", "Connection", "Test", "Plot")
+
+RANGE_LIMIT = 1e9
+RANGE_DECIMALS = 3
 
 
 def _spin(lo: float, hi: float, value: float, decimals: int, step: float, suffix: str):
@@ -61,6 +82,65 @@ def _spin(lo: float, hi: float, value: float, decimals: int, step: float, suffix
     return box
 
 
+def _note(text: str) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setWordWrap(True)
+    styled(lbl, lambda w: w.setStyleSheet(f"color: {muted(w)};"))
+    return lbl
+
+
+def _page(form: QFormLayout, note: str | None = None) -> QWidget:
+    page = QWidget()
+    col = QVBoxLayout(page)
+    col.addLayout(form)
+    if note:
+        col.addWidget(_note(note))
+    col.addStretch(1)
+    return page
+
+
+class AxisRange(QWidget):
+    """Auto, or a typed low and high, for one axis — DAqReader's widget of the
+    same name (from OpticalDistanceMeter). ``value()`` is ``None`` for auto and
+    for an inverted or empty pair, so a half-typed range fits the data instead
+    of drawing an empty frame."""
+
+    changed = Signal()
+
+    def __init__(self, rng: tuple[float, float] | None):
+        super().__init__()
+        self.auto = QCheckBox("Auto")
+        self.lo = QDoubleSpinBox()
+        self.hi = QDoubleSpinBox()
+        for spin, start in ((self.lo, 0.0), (self.hi, 1.0)):
+            spin.setRange(-RANGE_LIMIT, RANGE_LIMIT)
+            spin.setDecimals(RANGE_DECIMALS)
+            spin.setValue(start)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(self.auto)
+        row.addWidget(self.lo, 1)
+        row.addWidget(QLabel("to"))
+        row.addWidget(self.hi, 1)
+        self.auto.setChecked(rng is None)
+        if rng is not None:
+            self.lo.setValue(float(rng[0]))
+            self.hi.setValue(float(rng[1]))
+        self._on_auto(rng is None)
+        self.auto.toggled.connect(self._on_auto)
+
+    def _on_auto(self, on: bool) -> None:
+        self.lo.setEnabled(not on)
+        self.hi.setEnabled(not on)
+        self.changed.emit()
+
+    def value(self) -> tuple[float, float] | None:
+        if self.auto.isChecked():
+            return None
+        lo, hi = self.lo.value(), self.hi.value()
+        return (lo, hi) if hi > lo else None
+
+
 class SettingsDialog(QDialog):
     def __init__(self, settings: Settings, *, save=save_settings, parent=None):
         super().__init__(parent)
@@ -69,8 +149,17 @@ class SettingsDialog(QDialog):
         self._save = save
         t = settings.test
 
-        # ---- screen and port ----------------------------------------------
+        # ---- General ---------------------------------------------------------
+        self.theme = QComboBox()
+        for name in THEMES:
+            self.theme.addItem(THEME_LABELS[name], name)
+        self.theme.setCurrentIndex(max(0, self.theme.findData(settings.theme)))
         self.refresh = _spin(MIN_REFRESH_HZ, MAX_REFRESH_HZ, settings.refresh_hz, 1, 0.5, " Hz")
+        general = QFormLayout()
+        general.addRow("Theme", self.theme)
+        general.addRow("Screen redraws at most", self.refresh)
+
+        # ---- Connection ------------------------------------------------------
         self.port = QComboBox()
         self.port.setEditable(True)
         names = self._ports()
@@ -78,13 +167,13 @@ class SettingsDialog(QDialog):
             names.insert(0, settings.control_port)
         self.port.addItems(names)
         self.port.setCurrentText(settings.control_port)
-        general = QFormLayout()
-        general.addRow("Screen redraws at most", self.refresh)
-        general.addRow("Control mode's port", self.port)
-        general_box = QGroupBox("This computer")
-        general_box.setLayout(general)
+        self.auto_connect = QCheckBox("Connect to the controller as soon as control mode opens")
+        self.auto_connect.setChecked(settings.auto_connect)
+        connection = QFormLayout()
+        connection.addRow("Control mode's port", self.port)
+        connection.addRow(self.auto_connect)
 
-        # ---- the test: Proteus' template ----------------------------------
+        # ---- Test: Proteus' template ----------------------------------------
         self.peak = QCheckBox("Peak")
         self.peak.setChecked(t.peak)
         self.break_detection = QCheckBox("Break detection")
@@ -117,27 +206,47 @@ class SettingsDialog(QDialog):
         test.addRow("Force ramp: speed", self.force_speed)
         test.addRow("Force ramp: end", self.force_end)
         test.addRow("Measuring interval during the ramp", self.interval)
-        test_box = QGroupBox("The test (Proteus' test template)")
-        test_box.setLayout(test)
 
-        note = QLabel("Peak and Break detection are also the control window's switches; "
-                      "a flip there is remembered here. START refuses a ramp faster than "
-                      "the press file's [limits] and says so. The measuring interval is "
-                      "rounded to 10 ms.")
-        note.setWordWrap(True)
-        styled(note, lambda w: w.setStyleSheet(f"color: {muted(w)};"))
+        # ---- Plot ----------------------------------------------------------------
+        self.x_range = AxisRange(settings.plot.xlim)
+        self.y_range = AxisRange(settings.plot.ylim)
+        self._colour = settings.plot.colour
+        self.colour_btn = QPushButton("Colour…")
+        self.colour_btn.clicked.connect(self._choose_colour)
+        self._show_colour()
+        plot = QFormLayout()
+        plot.addRow("Displacement axis", self.x_range)
+        plot.addRow("Force axis", self.y_range)
+        plot.addRow("Curve colour", self.colour_btn)
+
+        self.tabs = QTabWidget()
+        self.tabs.addTab(_page(general, "The theme takes effect at once. The redraw rate is "
+                                        "a ceiling, not a target: every reading is taken in "
+                                        "whatever the screen shows."), TABS[0])
+        self.tabs.addTab(_page(connection, "Any port name may be typed. Connecting first "
+                                           "listens for 1.5 s and refuses if something "
+                                           "else — the old PC — is talking to the "
+                                           "controller."), TABS[1])
+        self.tabs.addTab(_page(test, "Peak and Break detection are also the control "
+                                     "window's switches; a flip there is remembered here. "
+                                     "START refuses a ramp faster than the press file's "
+                                     "[limits] and says so. The measuring interval is "
+                                     "rounded to 10 ms."), TABS[2])
+        self.tabs.addTab(_page(plot, "Auto fits the axis to the test's data; a fixed range "
+                                     "keeps it still while the test runs."), TABS[3])
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
                                    | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self._accept)
         buttons.rejected.connect(self.reject)
         root = QVBoxLayout(self)
-        root.addWidget(general_box)
-        root.addWidget(test_box)
-        root.addWidget(note)
-        root.addStretch(1)
+        root.addWidget(self.tabs)
         root.addWidget(buttons)
-        self.resize(520, self.sizeHint().height())
+        self.resize(540, self.sizeHint().height())
+
+    def show_tab(self, name: str) -> "SettingsDialog":
+        self.tabs.setCurrentIndex(TABS.index(name))
+        return self
 
     def _ports(self) -> list[str]:
         """The serial ports Windows knows of now."""
@@ -146,6 +255,24 @@ class SettingsDialog(QDialog):
             return sorted(p.device for p in list_ports.comports())
         except Exception:
             return []
+
+    # ---- the colour, its picker stubbed in tests -----------------------------
+
+    def _ask_colour(self, initial: str) -> str:
+        c = QColorDialog.getColor(QColor(initial), self, "Curve colour")
+        return c.name() if c.isValid() else ""
+
+    def _choose_colour(self) -> None:
+        chosen = self._ask_colour(self._colour)
+        if chosen:
+            self._colour = chosen
+            self._show_colour()
+
+    def _show_colour(self) -> None:
+        self.colour_btn.setText(f"  {self._colour}  ")
+        self.colour_btn.setStyleSheet(
+            f"QPushButton {{ background: {self._colour}; color: "
+            f"{'#000' if QColor(self._colour).lightness() > 140 else '#fff'}; }}")
 
     def _accept(self) -> None:
         interval = int(round(self.interval.value() / 10.0)) * 10
@@ -160,7 +287,15 @@ class SettingsDialog(QDialog):
             force_speed_kn_s=self.force_speed.value(),
             force_end_kn=self.force_end.value(),
             measuring_interval_ms=min(MAX_INTERVAL_MS, max(MIN_INTERVAL_MS, interval)))
-        self.settings = replace(self.settings, refresh_hz=float(self.refresh.value()),
-                                control_port=self.port.currentText().strip(), test=test)
+        self.settings = replace(
+            self.settings, refresh_hz=float(self.refresh.value()),
+            theme=self.theme.currentData(),
+            control_port=self.port.currentText().strip(),
+            auto_connect=self.auto_connect.isChecked(), test=test,
+            plot=PlotSettings(xlim=self.x_range.value(), ylim=self.y_range.value(),
+                              colour=self._colour))
         self._save(self.settings)
+        app = QApplication.instance()
+        if app is not None:
+            apply_theme(app, self.settings.theme)
         self.accept()

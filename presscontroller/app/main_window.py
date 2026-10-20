@@ -27,10 +27,11 @@ interval old. A message — a warning, a lost port — is said at once.
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QAction, QFontDatabase
+from PySide6.QtCore import QByteArray, Qt, QTimer
+from PySide6.QtGui import QAction, QFontDatabase, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -40,7 +41,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
-    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -61,6 +61,10 @@ TICK_MS = 50
 #: The screen's redraw ceiling, in hertz, when no settings are given — the
 #: global setting ``refresh_hz`` otherwise, as in DAqReader.
 REFRESH_HZ = 2.0
+
+#: Lines the status card's ramp line always takes, and the log below the plot.
+RAMP_LINES = 4
+LOG_LINES = 3
 
 #: Width of the reading column. The gauges hold a five-figure force and its
 #: unit at a size readable from the press.
@@ -88,13 +92,18 @@ class MainWindow(QMainWindow):
         self._ramp_warn: bool | None = None
         self._last_error_count = 0
         press = monitor.press
-        self.setWindowTitle(f"{DISPLAY_NAME} — {press.name} — {self.mode_title}")
+        self.setWindowTitle(" — ".join(x for x in (DISPLAY_NAME, press.name, self.mode_title)
+                                       if x))
 
         # ---- status card ---------------------------------------------------
         self.link_lbl = QLabel("–")
         self.phase_lbl = QLabel("–")
         self.ramp_lbl = QLabel("–")
         self.ramp_lbl.setWordWrap(True)
+        self.ramp_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        # Four lines always: a ramp line that grew and shrank with its text moved
+        # every gauge under it (operator, 2026-10-20).
+        self.ramp_lbl.setFixedHeight(RAMP_LINES * self.ramp_lbl.fontMetrics().lineSpacing())
         self.rate_lbl = QLabel("–")
         self.test_lbl = QLabel("–")
         status = QWidget()
@@ -145,16 +154,21 @@ class MainWindow(QMainWindow):
         self.log_view.setFont(mono)
         self.log_view.setFrameShape(QFrame.Shape.NoFrame)
         self.log_view.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
-        right = QSplitter(Qt.Orientation.Vertical)
-        right.addWidget(island(self.plot_view))
+        # The log is LOG_LINES tall, fixed: the plot takes the rest (operator,
+        # 2026-10-20 — no splitter to drag).
+        m = self.log_view.contentsMargins()
+        self.log_view.setFixedHeight(LOG_LINES * self.log_view.fontMetrics().lineSpacing()
+                                     + 2 * int(self.log_view.document().documentMargin())
+                                     + m.top() + m.bottom() + 2)
+        right = QVBoxLayout()
+        right.setContentsMargins(0, 0, 0, 0)
+        right.addWidget(island(self.plot_view), 1)
         right.addWidget(island(self.log_view))
-        right.setStretchFactor(0, 3)
-        right.setStretchFactor(1, 1)
 
         body = QHBoxLayout()
         body.addWidget(left_w)
-        body.addWidget(right, 1)
-        self.message = MessageIsland()
+        body.addLayout(right, 1)
+        self.message = MessageIsland(lines=1)
         root = QVBoxLayout()
         self._root = root
         """The window's outer column, so a mode can put its own bar on top."""
@@ -180,13 +194,21 @@ class MainWindow(QMainWindow):
         menu.addAction(self.settings_action)
         menu.addSeparator()
         menu.addAction(quit_)
+        self.full_screen_action = QAction("Full screen", self)
+        self.full_screen_action.setShortcut(QKeySequence(Qt.Key.Key_F11))
+        self.full_screen_action.setCheckable(True)
+        self.full_screen_action.triggered.connect(self.toggle_full_screen)
+        plot_settings = QAction("Plot settings…", self)
+        plot_settings.triggered.connect(lambda: self.open_settings("Plot"))
+        view = self.menuBar().addMenu("View")
+        view.addAction(self.full_screen_action)
+        view.addAction(plot_settings)
 
         self._base_message = self.intro()
         self.say(self._base_message)
         self._display = Coalescer(self._show, self.settings.refresh_hz, self)
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.tick)
-        self.resize(1400, 860)
 
     #: What the title bar calls this window's mode.
     mode_title = "monitor (listen-only)"
@@ -331,22 +353,60 @@ class MainWindow(QMainWindow):
         x_lbl = (f"Displacement since start load ({unit})" if fd.origin is not None
                  else f"Displacement ({unit})")
         title = f"Test {test.number}, {test.started:%Y-%m-%d %H:%M:%S}" if test else ""
+        ps = self.settings.plot
         self.plot_view.show_plot(lambda size, dpi, margins: render_force_displacement(
             fd.displacement, fd.force, peak=fd.peak, displacement_label=x_lbl,
             force_label=f_lbl, units=(unit, force.unit if force else ""), title=title,
-            size_px=size, dpi=dpi, margins=margins))
+            size_px=size, dpi=dpi, margins=margins, xlim=ps.xlim, ylim=ps.ylim,
+            colour=ps.colour))
 
     # ---- settings ----------------------------------------------------------
 
-    def open_settings(self) -> None:
-        dlg = SettingsDialog(self.settings, save=self._save, parent=self)
+    def open_settings(self, tab: str = "General") -> None:
+        dlg = SettingsDialog(self.settings, save=self._save, parent=self).show_tab(tab)
         if dlg.exec():
             self.apply_settings(dlg.settings)
 
     def apply_settings(self, settings: Settings) -> None:
-        """Take new settings into use: here, the redraw rate."""
+        """Take new settings into use: the redraw rate and the plot."""
         self.settings = settings
         self._display.set_rate(settings.refresh_hz)
+        self._display.post()
+
+    # ---- the window's place ------------------------------------------------
+
+    def restore_place(self) -> None:
+        """Open where and as the window was left: size, position, maximized or
+        full screen (Qt's saved geometry, kept in the settings)."""
+        g = self.settings.window_geometry
+        if not g or not self.restoreGeometry(QByteArray.fromBase64(g.encode("ascii"))):
+            self.resize(1400, 860)
+        self.full_screen_action.setChecked(self.isFullScreen())
+
+    def show_in_place(self) -> None:
+        """Show the window as :meth:`restore_place` left it."""
+        if self.isFullScreen():
+            self.showFullScreen()
+        elif self.isMaximized():
+            self.showMaximized()
+        else:
+            self.show()
+
+    def toggle_full_screen(self) -> None:
+        if self.isFullScreen():
+            self.showNormal()
+        else:
+            self.showFullScreen()
+        self.full_screen_action.setChecked(self.isFullScreen())
+
+    def _remember_place(self) -> None:
+        geometry = bytes(self.saveGeometry().toBase64()).decode("ascii")
+        if geometry != self.settings.window_geometry:
+            self.settings = replace(self.settings, window_geometry=geometry)
+            try:
+                self._save(self.settings)
+            except OSError:
+                pass            # a place not remembered costs a resize, nothing more
 
     # ---- saving ------------------------------------------------------------
 
@@ -381,6 +441,7 @@ class MainWindow(QMainWindow):
             os.startfile(self.tests_dir)        # noqa: S606 - Windows only, by design
 
     def closeEvent(self, ev) -> None:
+        self._remember_place()
         self._timer.stop()
         # A test still open when the window closes is kept too: closing the
         # monitor must not be how a test gets lost.

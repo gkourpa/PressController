@@ -122,3 +122,20 @@ ceiling, control mode's port, and the test — Proteus' template: Peak, break
 detection and its threshold, the start load, the ramp (Path and Force speed and
 end) and its measuring interval. Saved to the global settings file only on OK;
 locked during a test.
+
+## The window's frame (operator, 2026-10-20)
+
+- **Fixed heights, so nothing moves while a test runs**: the status card's ramp
+  line is always four lines, the log under the plot three (no splitter), the
+  message line one.
+- **Title**: the program and the press; the monitor adds "monitor
+  (listen-only)", control mode nothing.
+- **It opens as it was left**: size, position, maximized or **full screen**
+  (View → Full screen, F11), saved to the settings when the window closes.
+- **Settings…** has four tabs: **General** (theme — system, light, dark — and
+  the redraw ceiling), **Connection** (control mode's port; **connect by itself**
+  when control mode opens), **Test** (Proteus' template), **Plot** (each axis
+  fitted or a fixed range, and the curve's colour, as DAqReader's plots; also
+  View → Plot settings…).
+- Control mode no longer asks for confirmation at every launch; Connect still
+  listens first and refuses a busy line.

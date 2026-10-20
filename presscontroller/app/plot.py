@@ -118,7 +118,10 @@ def render_force_displacement(displacement: Sequence[float | None],
                                force_label: str = "Force (kN)",
                                units: tuple[str, str] = ("mm", "kN"), title: str = "",
                                size_px: tuple[int, int] = (720, 480), dpi: int = 100,
-                               margins: StickyMargins | None = None) -> np.ndarray:
+                               margins: StickyMargins | None = None,
+                               xlim: tuple[float, float] | None = None,
+                               ylim: tuple[float, float] | None = None,
+                               colour: str = "C0") -> np.ndarray:
     """Force against displacement, the newest point dotted, the peak marked.
 
     ``peak`` is ``(displacement, force)``; ``units`` are the two axes' units, in
@@ -128,6 +131,9 @@ def render_force_displacement(displacement: Sequence[float | None],
 
     Only the points where **both** channels have a value are drawn, so a gap in
     one leaves a break rather than a point invented from the other.
+
+    ``xlim``/``ylim`` fix an axis's range (``None``: fitted to the data) and
+    ``colour`` is the curve's — the settings' Plot tab, as DAqReader's plots.
     """
     fig = _figure(size_px, dpi)
     x, y = _array(displacement), _array(force)
@@ -135,9 +141,9 @@ def render_force_displacement(displacement: Sequence[float | None],
     if not good.size:
         return _empty(fig, title or "no test yet: waiting for START")
     ax = fig.add_subplot(111)
-    ax.plot(x, y, lw=1)
+    ax.plot(x, y, lw=1, color=colour)
     i = good[-1]
-    ax.plot([x[i]], [y[i]], marker="o", ms=LATEST_MARKER_MS, linestyle="none", color="C0")
+    ax.plot([x[i]], [y[i]], marker="o", ms=LATEST_MARKER_MS, linestyle="none", color=colour)
     if peak is not None:
         ax.plot([peak[0]], [peak[1]], marker="v", ms=PEAK_MARKER_MS, linestyle="none",
                 color="C3")
@@ -148,6 +154,10 @@ def render_force_displacement(displacement: Sequence[float | None],
     if title:
         ax.set_title(title, fontsize=9)
     ax.grid(True, alpha=0.3)
+    if xlim is not None:
+        ax.set_xlim(*xlim)
+    if ylim is not None:
+        ax.set_ylim(*ylim)
     _no_offset(ax)
     _lay_out(fig, margins)
     return _to_bgr(fig)

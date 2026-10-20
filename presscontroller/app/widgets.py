@@ -211,9 +211,10 @@ class MessageIsland(QFrame):
     it back.
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, lines: int = MESSAGE_LINES):
         super().__init__(parent)
         self.setObjectName("island")
+        self.lines = lines
         self.label = QLabel()
         self.label.setWordWrap(True)
         self.label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
@@ -246,7 +247,7 @@ class MessageIsland(QFrame):
         # which is what a label of unbreakable text would otherwise do.
         self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         styled(self, lambda w: w.setStyleSheet(ISLAND_QSS))
-        self.scroll.setFixedHeight(MESSAGE_LINES * self.label.fontMetrics().lineSpacing())
+        self.scroll.setFixedHeight(lines * self.label.fontMetrics().lineSpacing())
 
     def set_text(self, text: str) -> None:
         """Say ``text``, from its beginning.

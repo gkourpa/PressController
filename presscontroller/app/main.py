@@ -9,10 +9,15 @@
 
 **Control mode** talks to the controller itself, with the old PC unplugged,
 through the settings' ``control_port`` (the first time, the press file's
-``[control] port``, then remembered). It asks for that to be confirmed on every
-launch, and runs tests as Proteus does, within the press file's ``[limits]``
-(:mod:`presscontroller.control`, docs/motion.md). Its captures and tests go
-where the monitor's do, named ``*_control.jsonl``.
+``[control] port``, then remembered), and runs tests as Proteus does, within the
+press file's ``[limits]`` (:mod:`presscontroller.control`, docs/motion.md). It
+connects by itself when the settings' ``auto_connect`` is on. (A confirmation
+dialog on every launch was dropped once control mode had run on the press —
+operator, 2026-10-20; Connect still listens first and refuses a busy line.) Its
+captures and tests go where the monitor's do, named ``*_control.jsonl``.
+
+The window opens where, and as, it was last closed (size, position, maximized
+or full screen), in the settings' theme.
 
 The press file and the data folder are asked for once and remembered in the
 global settings. Live, every byte heard goes to ``<data>/captures/`` and every
@@ -86,9 +91,9 @@ def main(argv: list[str] | None = None) -> int:
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName(DISPLAY_NAME)
     follow_color_scheme(app)
-    apply_theme(app, "system")
 
     settings, problem = load_settings()
+    apply_theme(app, settings.theme)
     if problem:
         QMessageBox.warning(None, DISPLAY_NAME, problem)
     chosen = _choose_press(settings, args.press)
@@ -120,6 +125,7 @@ def main(argv: list[str] | None = None) -> int:
     save_settings(settings)
 
     win = MainWindow(Monitor(press), source, tests_dir=tests_dir, settings=settings)
+    win.restore_place()
     try:
         win.start()
     except Exception as exc:
@@ -129,23 +135,8 @@ def main(argv: list[str] | None = None) -> int:
                              f"adapters are plugged in and that {press.pc_port} and "
                              f"{press.ctrl_port} are the ports named in the press file.")
         return 1
-    win.show()
+    win.show_in_place()
     return app.exec()
-
-
-CONFIRM_CONTROL = """Control mode: this program will talk to the controller itself.
-
-Before continuing, check:
-  • the old PC is unplugged from the controller cable;
-  • the controller cable is plugged straight into the adapter on {port};
-  • the press is idle and nobody is at it.
-
-This program can run a test: START, PAUSE, CONTINUE and STOP (Cancel), with
-ramps limited by the press file's [limits]. STOP, or Esc, is Cancel: pump off.
-Pressing STOP on the controller's keypad hands control back to the keypad at
-once. Keep a hand on the controller's STOP during every test.
-
-Continue?"""
 
 
 def _run_control(app, settings, press: PressConfig) -> int:
@@ -160,9 +151,6 @@ def _run_control(app, settings, press: PressConfig) -> int:
                             "File → Settings… changes it.)")
         return 1
     settings = replace(settings, control_port=port)
-    answer = QMessageBox.question(None, DISPLAY_NAME, CONFIRM_CONTROL.format(port=port))
-    if answer != QMessageBox.StandardButton.Yes:
-        return 0
     data_dir = _choose_data_dir(settings)
     if data_dir is None:
         return 0
@@ -176,6 +164,7 @@ def _run_control(app, settings, press: PressConfig) -> int:
                                                capture=capture))
     win = ControlWindow(Monitor(press), session, tests_dir=Path(data_dir) / "tests",
                         settings=settings)
+    win.restore_place()
     try:
         win.start()
     except Exception as exc:
@@ -185,7 +174,9 @@ def _run_control(app, settings, press: PressConfig) -> int:
                              "adapter plugged in, and is the monitor or the sniffer still "
                              "using it?")
         return 1
-    win.show()
+    if settings.auto_connect:
+        session.connect()
+    win.show_in_place()
     return app.exec()
 
 

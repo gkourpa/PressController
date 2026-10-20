@@ -193,7 +193,7 @@ def test_the_control_window_connects_switches_and_disconnects_on_close(qapp, pre
     win, fake, saved = _control_window(qapp, press, monkeypatch)
     session = win.session
     try:
-        assert "CONTROL" in win.windowTitle()
+        assert win.windowTitle() == f"PressController — {press.name}"
         assert win.connect_btn.isEnabled() and not win.disconnect_btn.isEnabled()
         assert not win.start_btn.isEnabled() and not win.stop_btn.isEnabled()
         assert win.break_switch.isChecked() and not win.peak_switch.isChecked()
@@ -300,3 +300,60 @@ def test_the_settings_dialog_saves_only_on_ok(qapp):
     assert got.test.break_threshold_per_mil == 25.0 and got.control_port == "COM6"
     assert got.test.measuring_interval_ms in (200, 210)   # whole 10 ms steps
     assert got.test.problems() == []
+
+
+def test_the_settings_dialog_has_its_four_tabs_and_saves_them(qapp, monkeypatch):
+    from presscontroller.app.settings_dialog import TABS, SettingsDialog
+    from presscontroller.config.settings import Settings
+    saved = []
+    dlg = SettingsDialog(Settings(), save=saved.append).show_tab("Plot")
+    assert [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())] == list(TABS)
+    assert dlg.tabs.currentIndex() == TABS.index("Plot")
+    monkeypatch.setattr(dlg, "_ask_colour", lambda initial: "#d62728")
+    dlg.colour_btn.click()
+    dlg.y_range.auto.setChecked(False)
+    dlg.y_range.lo.setValue(0.0)
+    dlg.y_range.hi.setValue(2000.0)
+    dlg.theme.setCurrentIndex(dlg.theme.findData("dark"))
+    dlg.auto_connect.setChecked(True)
+    dlg._accept()
+    got = saved[-1]
+    assert got.plot.colour == "#d62728" and got.plot.ylim == (0.0, 2000.0)
+    assert got.plot.xlim is None and got.theme == "dark" and got.auto_connect
+
+
+def test_the_window_opens_where_it_was_closed(qapp, press):
+    from presscontroller.app.main_window import MainWindow
+    from presscontroller.config.settings import Settings
+    saved = []
+    src = ReplayTap(REAL_TEST, speed=1e9)
+    win = MainWindow(Monitor(press), src, settings=Settings(), save=saved.append)
+    win.restore_place()
+    win.setGeometry(20, 30, 760, 740)       # within the offscreen screen (800 x 800)
+    win.show()
+    qapp.processEvents()
+    left_as = (win.x(), win.y(), win.width(), win.height())
+    win.close()
+    geometry = saved[-1].window_geometry
+    assert geometry
+    again = MainWindow(Monitor(press), ReplayTap(REAL_TEST, speed=1e9),
+                       settings=saved[-1], save=saved.append)
+    again.restore_place()
+    assert (again.width(), again.height()) == left_as[2:]
+    # The offscreen platform's frame shifts the origin by a pixel or two.
+    assert abs(again.x() - left_as[0]) <= 4 and abs(again.y() - left_as[1]) <= 4
+    again.close()
+
+
+def test_the_plot_takes_its_settings(qapp, press):
+    from presscontroller.app.main_window import LOG_LINES, MainWindow
+    from presscontroller.config.settings import PlotSettings, Settings
+    win = _window(qapp, press, until=362.0)
+    try:
+        win.apply_settings(Settings(plot=PlotSettings(ylim=(0.0, 2000.0), colour="#d62728")))
+        win._display.flush()
+        assert win.settings.plot.colour == "#d62728"
+        assert win.log_view.height() < 5 * LOG_LINES * win.log_view.fontMetrics().lineSpacing()
+        assert win.message.lines == 1
+    finally:
+        win.close()

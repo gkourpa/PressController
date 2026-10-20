@@ -62,7 +62,7 @@ def _bold(label: QLabel) -> QLabel:
 
 
 class ControlWindow(MainWindow):
-    mode_title = "CONTROL"
+    mode_title = ""
 
     def __init__(self, monitor, session: ControllerSession, **kw):
         self.session = session

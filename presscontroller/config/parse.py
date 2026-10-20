@@ -67,3 +67,25 @@ def get_str_list(t: dict, key: str, where: str) -> tuple[str, ...]:
     return tuple(v)
 
 
+def get_range(t: dict, key: str, where: str) -> tuple[float, float] | None:
+    """A ``[low, high]`` axis range, or ``None`` where the key is absent.
+
+    An inverted or empty pair is refused here rather than carried to the plot,
+    where matplotlib draws a frame with nothing in it and says nothing about why
+    — which on a live plot reads as the channel having stopped.
+    """
+    if key not in t:
+        return None
+    v = t[key]
+    ok = (isinstance(v, list) and len(v) == 2
+          and all(not isinstance(x, bool) and isinstance(x, (int, float)) for x in v))
+    if not ok:
+        raise ConfigError(f"{_where(where, key)} must be two numbers, "
+                          f"[low, high], not {v!r}")
+    lo, hi = float(v[0]), float(v[1])
+    if not (math.isfinite(lo) and math.isfinite(hi)):
+        raise ConfigError(f"{_where(where, key)} must be finite numbers, not {v!r}")
+    if hi <= lo:
+        raise ConfigError(f"{_where(where, key)} must be [low, high] with the high "
+                          f"one larger, not {v!r}")
+    return (lo, hi)
