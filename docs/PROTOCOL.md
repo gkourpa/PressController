@@ -356,17 +356,20 @@ Step 27's ramp, `#D1233;0;100000;0;1` (2 mm/min) on the specimen at 67 mm, ran a
   differing only in the switch, CONTINUE ~9 s after the start load in both: off **2.10 mm/min**, on
   **2.15 mm/min**. The operator doubted step 28's conclusion and was right.
 
-Step 27 sent the same lines in the same order as step 29's second test. **What slowed step 27 is not
-known and was not in what was sent**; its only visible difference is a longer wait at the start load
-(16.6 s, against 6–9 s). The monitor's measured rate is what showed it, and is how it would be caught
-again.
+Step 27 sent the same lines in the same order as step 29's second test, so **what slowed it was not
+in what was sent**. The operator: **it happens on the first run only** — the first ramp of the day.
+The recordings agree: step 15 (Proteus, the first ramp of 2026-10-19) ran 10 mm/min at 2.23, and step
+27 (the first ramp of 2026-10-20; step 26 only approached) ran 2 at 0.74, while steps 28 and 29 — each
+the first test of a fresh program session, but not of the day — ran at the set speed. So it is the
+press, not the program or Proteus: most likely the hydraulics warming up (cold oil, a sluggish servo
+valve). Hypothesis. The monitor's measured rate shows it, with a warning beyond 20 %.
 
 `#B27` again: step 29's second test (break detection on) got `#B27` 0.5 s after STOP as the force fell
 104 → 63 kN (41 kN); the first (off), stopped at the same 104 kN, got nothing.
 
-Proteus' own path ramps under load also show a ceiling (break detection off): 10 mm/min ran at 2.23
-(step 15), 3 at 2.33 (step 17), 2 at 2.09 (23), 1 at 1.11 (18); only step 19, without load, ran 10 at
-9.77. Step 15's "slow ramp" was this ceiling, not Proteus.
+Proteus' path ramps under load, for comparison: 10 mm/min ran at 2.23 (step 15, the day's first),
+3 at 2.33 (step 17), 2 at 2.09 (23), 1 at 1.11 (18); step 19 ran 10 at 9.77 on a specimen that hardly
+loaded. Whether the press also has a ceiling near 2.3 mm/min under load (step 17) is open.
 
 ### Control mode: this program in Proteus' place, 2026-10-19, `captures/20261019_174926_step24_control_connect.jsonl`, `…175412_step25_control_connect_again.jsonl`
 
@@ -505,7 +508,8 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 - Which start-up command makes **PC** / **FO** appear on the controller display.
 - Meaning of display indicators ZB, (bottom) FO, LD.
 - What Proteus puts in the ramp's start field (0×, 1×, 2×, 0×, 0× the piston position in steps 15–19); it does not affect the speed (steps 17–19).
-- Why step 27's 2 mm/min ramp ran at 0.74 mm/min with exactly the lines that ran at 2.15 in step 29 (not break detection: step 29).
+- Whether the first ramp of the day is always slow (steps 15, 27), and whether a warm-up run (pump on, a few minutes, or one ramp without a specimen) prevents it.
+- Whether a path ramp under load is limited near 2.3 mm/min (step 17: 3 set, 2.33 measured).
 - What limits a path ramp under load to about 2.3 mm/min (steps 15, 17); step 19 ran 10 mm/min without load.
 - Ramp field 4 (`0`) and whether field 5 changes with Force/Deformation control.
 - Whether `#B27` (step 27) is the break report at a real failure, and whether the controller stops the pump by itself on it.
