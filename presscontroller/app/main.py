@@ -19,10 +19,17 @@ captures and tests go where the monitor's do, named ``*_control.jsonl``.
 The window opens where, and as, it was last closed (size, position, maximized
 or full screen), in the settings' theme.
 
-The press file and the data folder are asked for once and remembered in the
-global settings. Live, every byte heard goes to ``<data>/captures/`` and every
-test the monitor closes to ``<data>/tests/``. A replay writes nothing on its
-own: it is the recording already, and a test from it is saved only on request.
+**The first run asks for nothing it can do without** (operator, 2026-10-20: the
+press PC has no file of ours, and none is to be copied there). With no press
+file it writes the lab's (:data:`~presscontroller.config.press.DEFAULT_PRESS`)
+beside the settings; with no data folder it uses ``Documents\\PressController``;
+with no control port it opens Settings at Connection to pick one. All three are
+remembered in the global settings, and File → Settings… changes them. A press
+file named with ``--press`` that is not there is still asked for.
+
+Live, every byte heard goes to ``<data>/captures/`` and every test the monitor
+closes to ``<data>/tests/``. A replay writes nothing on its own: it is the
+recording already, and a test from it is saved only on request.
 """
 
 from __future__ import annotations
@@ -40,8 +47,13 @@ from presscontroller.app.resources import app_icon
 from presscontroller.app.main_window import MainWindow
 from presscontroller.app.theme import apply_theme, follow_color_scheme
 from presscontroller.config.parse import ConfigError
-from presscontroller.config.press import PressConfig, load_press
-from presscontroller.config.settings import load_settings, save_settings
+from presscontroller.config.press import PressConfig, load_press, write_default_press
+from presscontroller.config.settings import (
+    default_data_dir,
+    default_press_path,
+    load_settings,
+    save_settings,
+)
 from presscontroller.monitor import Monitor
 from presscontroller.tap import CaptureWriter, ReplayTap, SerialTap
 from presscontroller.tap.serial_tap import LINE_SETTINGS
@@ -59,8 +71,13 @@ def _args(argv: list[str]) -> argparse.Namespace:
 
 
 def _choose_press(settings, given: str | None) -> tuple[PressConfig, str] | None:
-    """The press file to use, asked for until one loads without problems."""
+    """The press file to use, asked for until one loads without problems.
+
+    With none named and none remembered (or the remembered one gone), the
+    default one beside the settings, written the first time."""
     path = given or settings.press_file
+    if not given and not (path and Path(path).is_file()):
+        path = str(write_default_press(default_press_path()))
     while True:
         if not path or not Path(path).is_file():
             path, _ = QFileDialog.getOpenFileName(None, "Choose the press file", "",
@@ -79,11 +96,33 @@ def _choose_press(settings, given: str | None) -> tuple[PressConfig, str] | None
 
 
 def _choose_data_dir(settings) -> str | None:
-    if settings.data_dir and Path(settings.data_dir).is_dir():
-        return settings.data_dir
+    """The folder for captures and tests: the remembered one, else
+    ``Documents\\PressController``, made if missing. Asked for only when it
+    cannot be made — a remembered folder on a drive that is not there is not
+    silently swapped for another."""
+    path = settings.data_dir or str(default_data_dir())
+    try:
+        Path(path).mkdir(parents=True, exist_ok=True)
+        return path
+    except OSError:
+        pass
     chosen = QFileDialog.getExistingDirectory(
-        None, "Choose where the monitor keeps its captures and tests")
+        None, "Choose where the captures and tests are kept")
     return chosen or None
+
+
+def _choose_control_port(settings, save):
+    """The settings with a control port: the first time, Settings opens at
+    Connection to pick it. ``None`` when the operator cancels."""
+    from presscontroller.app.settings_dialog import SettingsDialog
+
+    QMessageBox.information(None, DISPLAY_NAME, "Choose the port the controller cable is "
+                            "plugged into (the USB serial adapter's COM port). It is "
+                            "remembered; File → Settings… changes it.")
+    dlg = SettingsDialog(settings, save=save).show_tab("Connection")
+    if not dlg.exec() or not dlg.settings.control_port:
+        return None
+    return dlg.settings
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -114,6 +153,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.replay:
         source = ReplayTap(args.replay, speed=args.speed)
     else:
+        if press.tap_problems():
+            QMessageBox.warning(None, DISPLAY_NAME, "The listen-only monitor needs the tap's "
+                                f"two ports, named in the press file {press_path}:\n\n"
+                                + "\n".join(f"• {p}" for p in press.tap_problems()))
+            return 1
         data_dir = _choose_data_dir(settings)
         if data_dir is None:
             return 0
@@ -147,11 +191,10 @@ def _run_control(app, settings, press: PressConfig) -> int:
 
     port = settings.control_port or press.control_port.strip()
     if not port:
-        QMessageBox.warning(None, DISPLAY_NAME, "No control port is set: name the adapter "
-                            "the controller cable is plugged into — control_port in the "
-                            "settings file, or [control] port in the press file. (Once set, "
-                            "File → Settings… changes it.)")
-        return 1
+        chosen = _choose_control_port(settings, save_settings)
+        if chosen is None:
+            return 0
+        settings, port = chosen, chosen.control_port
     settings = replace(settings, control_port=port)
     data_dir = _choose_data_dir(settings)
     if data_dir is None:

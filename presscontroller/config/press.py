@@ -30,6 +30,13 @@ A minimal file::
 Like DAqReader's experiment files, a wrong *type* is a :class:`ConfigError` and
 an unusable value is a problem from :meth:`PressConfig.problems`, so every one
 is named at once.
+
+**The first run needs no file** (operator, 2026-10-20: on the press PC there is
+none, and none is to be copied there): :func:`write_default_press` writes
+:data:`DEFAULT_PRESS` — the lab's press, as Proteus holds it — with no ports.
+Control mode takes its port from the settings; only the listen-only monitor's
+live tap needs ``[tap]``, and :meth:`PressConfig.tap_problems` says so when it
+is started without one.
 """
 
 from __future__ import annotations
@@ -93,14 +100,20 @@ class PressConfig:
     def by_name(self, name: str) -> Channel | None:
         return next((c for c in self.channels if c.name == name), None)
 
-    def problems(self) -> list[str]:
+    def tap_problems(self) -> list[str]:
+        """What stops the live tap: a port not named. Only the listen-only
+        monitor listens through the tap; control mode and a replay do not."""
         out = []
-        if self.resolution <= 0:
-            out.append(f"resolution must be above zero, not {self.resolution}")
         if not self.pc_port.strip():
             out.append("tap.pc_port is blank: name the port that hears the PC")
         if not self.ctrl_port.strip():
             out.append("tap.ctrl_port is blank: name the port that hears the controller")
+        return out
+
+    def problems(self) -> list[str]:
+        out = []
+        if self.resolution <= 0:
+            out.append(f"resolution must be above zero, not {self.resolution}")
         if self.pc_port.strip() and self.pc_port.strip().upper() == self.ctrl_port.strip().upper():
             out.append(f"tap.pc_port and tap.ctrl_port are both {self.pc_port}: "
                        "each direction needs its own adapter")
@@ -182,3 +195,62 @@ def load_press(path: str | Path) -> tuple[PressConfig, list[str]]:
                       max_force_rate_kn_s=get_opt_float(limits, "max_force_rate_kn_s",
                                                         f"{where} [limits]"))
     return cfg, problems + cfg.problems()
+
+
+#: The press file written on the first run: the lab's FORM+TEST 4000 kN press,
+#: with the ranges and the resolution Proteus holds (docs/PROTOCOL.md) and the
+#: limits found on it (step 22) -- and no ports, which belong to the PC.
+DEFAULT_PRESS = """# The lab's FORM+TEST 4000 kN compression press (University of Patras), written
+# by PressController on its first run. Edit it here; it is never overwritten.
+# Ranges and resolution as Proteus holds them
+#   (Configuration -> Hardware Configuration -> Machine / Channels).
+name = "FORM+TEST 4000 kN"
+resolution = 600000
+
+# Only for the listen-only monitor's tap (two adapters on a Y-cable, Proteus in
+# charge). Control mode does not use it: its port is in File -> Settings...
+[tap]
+pc_port = ""     # the adapter whose RX hears line pin 3 (PC -> controller)
+ctrl_port = ""   # the adapter whose RX hears line pin 2 (controller -> PC)
+
+# The fastest ramps this press is to be run at. A ramp above them is said out loud
+# the moment it is sent, and this program's own START will refuse it. Under load
+# the press followed about 20 mm/min at most; above that the ramp's target runs
+# ahead of the piston and PAUSE does not hold (docs/PROTOCOL.md, step 22).
+[limits]
+max_path_rate_mm_min = 10.0
+max_force_rate_kn_s = 15.0
+
+# `index` is the number the controller gives the channel in its stream.
+# The plots draw the channels named "Force" and "Path".
+[[channel]]
+index = 0
+name = "Force"
+unit = "kN"
+range = 4000.0
+decimals = 2
+
+[[channel]]
+index = 1
+name = "Path"
+unit = "mm"
+range = 100.0
+decimals = 3
+
+[[channel]]
+index = 2
+name = "Deformation"
+unit = "mm"
+range = 5.0
+decimals = 4
+"""
+
+
+def write_default_press(path: str | Path) -> Path:
+    """Write :data:`DEFAULT_PRESS` to ``path`` unless a file is there already --
+    the operator's edits are never overwritten."""
+    path = Path(path)
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(DEFAULT_PRESS, encoding="utf-8")
+    return path

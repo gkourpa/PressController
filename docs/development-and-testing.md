@@ -85,8 +85,9 @@ mode, `--control`) and **PressController monitor (listen-only)**.
 
 - **Upgrades in place** (fixed AppId) and replaces `_internal` wholesale.
 - **Never touches** `%APPDATA%\PressController` (the settings) or the operator's
-  press file, captures and tests; **no `*.toml` is packaged** — a press file is
-  one lab's, copied to a new PC by hand.
+  press file, captures and tests; **no `*.toml` is packaged**. A new PC needs
+  none: the first run writes the lab's press file (no ports) beside the
+  settings, and asks for the control port in Settings.
 - **Refuses to build from uncommitted changes**, so a setup's number always
   names one commit.
 

@@ -4,7 +4,9 @@ As DAqReader's settings dialog: it edits the :class:`Settings` it is given, and
 only OK saves (``settings`` holds the result; after Cancel it is what was passed
 in). The theme takes effect at once on OK, as DAqReader's does.
 
-* **General** — the theme (system, light, dark) and the screen's redraw ceiling.
+* **General** — the theme (system, light, dark), the screen's redraw ceiling,
+  and the files: the data folder (chosen here; used from the next start) and
+  the press file in use (shown, with its folder a click away, to be edited).
 * **Connection** — control mode's port, and whether it connects by itself.
 * **Test** — Proteus' test template (docs/motion.md): Peak, break detection and
   its threshold, the start load, the ramps and the measuring interval; what the
@@ -17,16 +19,19 @@ Every value is limited to the range a settings file may hold
 the press file's ``[limits]`` are, and START refuses a ramp above them, saying
 so — in visible text here, not a tooltip.
 
-The serial ports offered come from :meth:`SettingsDialog._ports` and the colour
-from :meth:`SettingsDialog._ask_colour`, methods so a test can stub them.
+The serial ports offered come from :meth:`SettingsDialog._ports`, the colour
+from :meth:`SettingsDialog._ask_colour` and the folder from
+:meth:`SettingsDialog._ask_folder`, methods so a test can stub them.
 """
 
 from __future__ import annotations
 
 from dataclasses import replace
 
-from PySide6.QtCore import Signal
-from PySide6.QtGui import QColor
+from pathlib import Path
+
+from PySide6.QtCore import QUrl, Signal
+from PySide6.QtGui import QColor, QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -35,6 +40,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
+    QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -147,6 +153,7 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("PressController — settings")
         self.settings = settings
         self._save = save
+        self._data_dir = settings.data_dir
         t = settings.test
 
         # ---- General ---------------------------------------------------------
@@ -155,9 +162,26 @@ class SettingsDialog(QDialog):
             self.theme.addItem(THEME_LABELS[name], name)
         self.theme.setCurrentIndex(max(0, self.theme.findData(settings.theme)))
         self.refresh = _spin(MIN_REFRESH_HZ, MAX_REFRESH_HZ, settings.refresh_hz, 1, 0.5, " Hz")
+        self.data_dir = QLabel(settings.data_dir or "–")
+        self.data_dir.setWordWrap(True)
+        data_btn = QPushButton("Choose…")
+        data_btn.clicked.connect(self._choose_data_dir)
+        data_row = QHBoxLayout()
+        data_row.addWidget(self.data_dir, 1)
+        data_row.addWidget(data_btn)
+        self.press_file = QLabel(settings.press_file or "–")
+        self.press_file.setWordWrap(True)
+        press_btn = QPushButton("Show…")
+        press_btn.setEnabled(bool(settings.press_file))
+        press_btn.clicked.connect(self._show_press_folder)
+        press_row = QHBoxLayout()
+        press_row.addWidget(self.press_file, 1)
+        press_row.addWidget(press_btn)
         general = QFormLayout()
         general.addRow("Theme", self.theme)
         general.addRow("Screen redraws at most", self.refresh)
+        general.addRow("Data folder", data_row)
+        general.addRow("Press file", press_row)
 
         # ---- Connection ------------------------------------------------------
         self.port = QComboBox()
@@ -222,7 +246,10 @@ class SettingsDialog(QDialog):
         self.tabs = QTabWidget()
         self.tabs.addTab(_page(general, "The theme takes effect at once. The redraw rate is "
                                         "a ceiling, not a target: every reading is taken in "
-                                        "whatever the screen shows."), TABS[0])
+                                        "whatever the screen shows. A new data folder is "
+                                        "used from the next start. The press file holds the "
+                                        "press's channels and limits; edit it in a text "
+                                        "editor and restart."), TABS[0])
         self.tabs.addTab(_page(connection, "Any port name may be typed. Connecting first "
                                            "listens for 1.5 s and refuses if something "
                                            "else — the old PC — is talking to the "
@@ -255,6 +282,20 @@ class SettingsDialog(QDialog):
             return sorted(p.device for p in list_ports.comports())
         except Exception:
             return []
+
+    # ---- the files, the folder picker stubbed in tests -----------------------
+
+    def _ask_folder(self, initial: str) -> str:
+        return QFileDialog.getExistingDirectory(self, "Data folder", initial)
+
+    def _choose_data_dir(self) -> None:
+        chosen = self._ask_folder(self.settings.data_dir)
+        if chosen:
+            self._data_dir = str(Path(chosen))
+            self.data_dir.setText(self._data_dir)
+
+    def _show_press_folder(self) -> None:
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(self.settings.press_file).parent)))
 
     # ---- the colour, its picker stubbed in tests -----------------------------
 
@@ -289,7 +330,7 @@ class SettingsDialog(QDialog):
             measuring_interval_ms=min(MAX_INTERVAL_MS, max(MIN_INTERVAL_MS, interval)))
         self.settings = replace(
             self.settings, refresh_hz=float(self.refresh.value()),
-            theme=self.theme.currentData(),
+            theme=self.theme.currentData(), data_dir=self._data_dir,
             control_port=self.port.currentText().strip(),
             auto_connect=self.auto_connect.isChecked(), test=test,
             plot=PlotSettings(xlim=self.x_range.value(), ylim=self.y_range.value(),

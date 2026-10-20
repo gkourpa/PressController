@@ -211,6 +211,17 @@ def settings_path() -> Path:
     return Path(base) / APP_DIRNAME / "settings.toml"
 
 
+def default_press_path() -> Path:
+    """Where the first run writes the press file: beside the settings."""
+    return settings_path().parent / "press.toml"
+
+
+def default_data_dir() -> Path:
+    """Where captures and tests go until the operator picks a folder:
+    ``Documents\\PressController``."""
+    return Path.home() / "Documents" / APP_DIRNAME
+
+
 _TEST_KEYS = {f.name for f in fields(TemplateSettings)}
 
 

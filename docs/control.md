@@ -12,10 +12,12 @@ been run on the press yet.
 2. Take the controller cable off the Y-cable (or the old PC) and plug it
    **straight into the adapter named by the settings' `control_port`**
    (File → Settings…; the lab: Digitus "A", COM7). The first time it is taken
-   from the press file's `[control] port` and remembered. The tap is not needed in control mode: the
+   from the press file's `[control] port`, or — with none there, as on a new
+   PC — picked in Settings, which opens by itself; then it is remembered. The tap is not needed in control mode: the
    program records both directions itself.
 3. The press idle, nobody at it.
-4. `python -m presscontroller.app --control`, and confirm the dialog.
+4. `python -m presscontroller.app --control` (installed: the Start menu's
+   **PressController**).
 
 **To go back to Proteus:** close the program (it disconnects first), plug the
 controller cable back into the old PC, start Proteus.

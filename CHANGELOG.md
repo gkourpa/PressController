@@ -33,6 +33,11 @@ The first installer. Control mode runs tests on the press without Proteus.
   ranges and colour. The window opens as it was left (size, position,
   maximized, full screen with F11).
 - The app icon, and a Windows installer (`tools/build_installer.py`).
+- **The first run needs no file**: with none, the program writes the lab's press
+  file beside the settings (`%APPDATA%\PressController\press.toml`, no ports),
+  keeps captures and tests in `Documents\PressController`, and in control mode
+  opens Settings at Connection to pick the port. Settings → General shows the
+  press file and changes the data folder.
 
 ### Changed
 

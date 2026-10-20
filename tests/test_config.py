@@ -121,3 +121,38 @@ def test_a_settings_file_from_before_the_test_settings_still_loads(_sandboxed_se
     settings, problem = load_settings()
     assert problem is None and settings.test == TemplateSettings()
     assert settings.test.break_detection is True                  # operator, 2026-10-19
+
+
+def test_the_default_press_is_the_labs_and_loads_without_problems(tmp_path):
+    from presscontroller.config.press import write_default_press
+    lab = tmp_path / "press.toml"
+    write_default_press(lab)
+    cfg, problems = load_press(lab)
+    assert problems == []
+    assert (cfg.name, cfg.resolution) == ("FORM+TEST 4000 kN", 600000)
+    assert [(c.name, c.range) for c in cfg.channels] == [
+        ("Force", 4000.0), ("Path", 100.0), ("Deformation", 5.0)]
+    assert (cfg.max_path_rate_mm_min, cfg.max_force_rate_kn_s) == (10.0, 15.0)
+    # No ports: they belong to the PC. Control mode takes its own from the
+    # settings; only the live tap needs these, and says so.
+    assert cfg.control_port == ""
+    assert cfg.tap_problems() == [
+        "tap.pc_port is blank: name the port that hears the PC",
+        "tap.ctrl_port is blank: name the port that hears the controller"]
+
+
+def test_the_default_press_never_overwrites_the_operators(tmp_path):
+    from presscontroller.config.press import write_default_press
+    p = _write(tmp_path, 'name = "edited"\n')
+    write_default_press(p)
+    assert p.read_text(encoding="utf-8") == 'name = "edited"\n'
+
+
+def test_the_first_run_files_sit_beside_the_settings_and_in_documents(_sandboxed_settings,
+                                                                      monkeypatch, tmp_path):
+    from pathlib import Path
+
+    from presscontroller.config.settings import default_data_dir, default_press_path
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    assert default_press_path() == _sandboxed_settings.parent / "press.toml"
+    assert default_data_dir() == tmp_path / "home" / "Documents" / "PressController"

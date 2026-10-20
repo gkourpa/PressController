@@ -364,3 +364,41 @@ def test_the_app_has_its_icon(qapp):
     assert ICON_ICO.is_file() and ICON_SVG.is_file()
     icon = app_icon()
     assert not icon.isNull() and {16, 32, 256} <= {s.width() for s in icon.availableSizes()}
+
+
+def test_the_first_run_asks_for_no_file(qapp, _sandboxed_settings, monkeypatch, tmp_path):
+    """The press PC has no file of ours (operator, 2026-10-20): the press file
+    is written beside the settings, the data folder made in Documents."""
+    from pathlib import Path
+
+    from presscontroller.app import main
+    from presscontroller.config.settings import Settings
+    monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
+    monkeypatch.setattr(main.QFileDialog, "getOpenFileName",
+                        lambda *a, **k: pytest.fail("asked for a press file"))
+    monkeypatch.setattr(main.QFileDialog, "getExistingDirectory",
+                        lambda *a, **k: pytest.fail("asked for a folder"))
+    cfg, path = main._choose_press(Settings(), None)
+    assert Path(path) == _sandboxed_settings.parent / "press.toml"
+    assert cfg.by_name("Force").range == 4000.0
+    data = main._choose_data_dir(Settings())
+    assert Path(data) == tmp_path / "home" / "Documents" / "PressController"
+    assert Path(data).is_dir()
+    # A remembered press file that is gone falls back to the default, too.
+    cfg, path = main._choose_press(Settings(press_file=str(tmp_path / "gone.toml")), None)
+    assert Path(path) == _sandboxed_settings.parent / "press.toml"
+
+
+def test_the_settings_dialog_chooses_the_data_folder(qapp, tmp_path):
+    from presscontroller.app.settings_dialog import SettingsDialog
+    from presscontroller.config.settings import Settings
+    saved = []
+    dlg = SettingsDialog(Settings(data_dir="C:/old", press_file="C:/lab/press.toml"),
+                         save=saved.append)
+    assert dlg.press_file.text() == "C:/lab/press.toml"
+    dlg._ask_folder = lambda initial: str(tmp_path)
+    dlg._choose_data_dir()
+    assert dlg.data_dir.text() == str(tmp_path)
+    dlg._accept()
+    assert saved[-1].data_dir == str(tmp_path)
+    assert saved[-1].press_file == "C:/lab/press.toml"

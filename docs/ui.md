@@ -1,7 +1,19 @@
 # The window
 
-Run with `python -m presscontroller.app` (or `python run_app.py`). The first
-launch asks for the press file and the data folder; both are remembered.
+Run with `python -m presscontroller.app` (or `python run_app.py`). **The first
+launch asks for no file** (operator, 2026-10-20 — the press PC has none of
+ours): it writes the lab's press file beside the settings
+(`%APPDATA%\PressController\press.toml`, ports blank; it is never overwritten),
+keeps captures and tests in `C:\Users\<user>\Documents\PressController`, and
+in control mode opens Settings at Connection to pick the port. All three are
+remembered; Settings → General shows the press file and changes the data folder
+(from the next start). The listen-only monitor's live tap needs the press
+file's `[tap]` ports, and says so if they are blank.
+
+**Two files, on purpose** (operator, 2026-10-20): `settings.toml` is this PC's
+and operator's choices, rewritten whole on every OK and every close;
+`press.toml` is the press — ranges, resolution, the ramp limits — read only,
+so no dialog can lose or change a limit.
 `--replay CAPTURE.jsonl [--speed N]` plays a recording instead of listening.
 
 ## Listen-only
