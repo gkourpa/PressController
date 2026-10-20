@@ -15,7 +15,7 @@ Usage:
     python tools/sniff.py --pc-port COM5 --ctrl-port COM6 --baud 9600
 
 While capturing, type a note and press Enter (e.g. "clicked Zero") to drop a
-marker into the log. Ctrl+C stops. Each session writes captures/<timestamp>.jsonl
+marker into the log. Ctrl+C stops. Each session writes data/captures/<timestamp>.jsonl
 (machine-readable) and .txt (human-readable).
 """
 
@@ -202,7 +202,7 @@ def main():
     p.add_argument("--lines", action="store_true", help="also log CTS/DSR/RI/CD changes")
     p.add_argument("--duration", type=float, default=0, help="stop after this many seconds (0 = until Ctrl+C)")
     p.add_argument("--scan-seconds", type=float, default=3)
-    p.add_argument("--out", default="captures")
+    p.add_argument("--out", default="data/captures")
     args = p.parse_args()
 
     if args.list:

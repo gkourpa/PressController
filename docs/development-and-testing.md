@@ -25,7 +25,7 @@ py -3.14 -m venv .venv
 .venv\Scripts\python -m presscontroller.app --control
 
 # The monitor on a recording, ten times faster than it happened
-.venv\Scripts\python -m presscontroller.app --replay captures\20261019_143520_step15_real_test.jsonl --speed 10
+.venv\Scripts\python -m presscontroller.app --replay data\captures\20261019_143520_step15_real_test.jsonl --speed 10
 
 # The bench sniffer: raw two-direction capture, baud scan
 .venv\Scripts\python tools\sniff.py --list

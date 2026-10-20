@@ -7,5 +7,6 @@ build/
 dist/
 out/
 
-# The lab's own press file and what the monitor records live.
+# The lab's own press file, the Proteus CD, and every recording -- the
+# protocol notes' captures included (data/captures): none belong in the repository.
 data/

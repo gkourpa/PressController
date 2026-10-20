@@ -9,7 +9,7 @@ Status markers: **confirmed** (seen in captures and cross-checked), **hypothesis
 
 ## Controller → PC: measurement stream
 
-Example (idle, measurement window open, `captures/20261016_idle8s_ctrl2pc.bin`):
+Example (idle, measurement window open, `data/captures/20261016_idle8s_ctrl2pc.bin`):
 
 ```
 #D0819630;0;-1246;1;15859;2;-25637<CR><LF>
@@ -57,7 +57,7 @@ All messages in both directions are ASCII lines `#<letter><text><CR><LF>`. Hypot
 (command, 2 digits), `D` = data/value, `O` = OK/acknowledge. Controller `#D1…` lines look like single
 value replies, `#D0…` lines are the periodic measurement stream.
 
-### Start-up sequence (Proteus start → measurement window), 2026-10-16, `captures/20261016_162921_step10_startup.*`
+### Start-up sequence (Proteus start → measurement window), 2026-10-16, `data/captures/20261016_162921_step10_startup.*`
 
 Times relative to the first command. Controller was silent before it (stream stops when Proteus closes).
 
@@ -84,7 +84,7 @@ Times relative to the first command. Controller was silent before it (stream sto
 
 Stream line here: `#D08` + counter `70941`.
 
-### Shut-down sequence (closing Proteus), 2026-10-16, `captures/20261016_163107_step11_shutdown.*`
+### Shut-down sequence (closing Proteus), 2026-10-16, `data/captures/20261016_163107_step11_shutdown.*`
 
 | t (ms) | Dir | Line | Notes |
 |---|---|---|---|
@@ -96,10 +96,10 @@ Stream line here: `#D08` + counter `70941`.
 
 No acknowledgement from the controller to either command.
 
-Start-up repeated identically on 2026-10-16 16:33 (`captures/20261016_163343_step12_buttons.*`):
+Start-up repeated identically on 2026-10-16 16:33 (`data/captures/20261016_163343_step12_buttons.*`):
 same 12 commands, same order, same replies → it's a fixed script, not state-dependent.
 
-### Operation buttons (measurement window), `captures/20261016_163343_step12_buttons.*`
+### Operation buttons (measurement window), `data/captures/20261016_163343_step12_buttons.*`
 
 Clicked ~10 s apart: Reset, Peak (on), Peak (off), BR (on), BR (off). Four commands seen, none acknowledged,
 stream format unchanged:
@@ -129,7 +129,7 @@ The green part does not follow the state (probably "used/armed" indicator or a P
 **Proteus does not set Peak/BR at start-up**, so the controller keeps whatever state it had; a
 replacement app should send `#B30`/`#B31` and `#B32`/`#B33` explicitly after connecting.
 
-### Test run: START → Cancel (dry run, no specimen), 2026-10-16, `captures/20261016_171547_step13_dryrun_start_cancel.*`
+### Test run: START → Cancel (dry run, no specimen), 2026-10-16, `data/captures/20261016_171547_step13_dryrun_start_cancel.*`
 
 Template "Test universal / Würfel 150×150×150": Start load 0.1 % of range; Ramp = **path control**,
 10 mm/min, end 100 mm, measuring interval 200 ms. Only the approach phase was run (no CONTINUE).
@@ -150,7 +150,7 @@ Max path in the stream 20.898 mm = the maximum Proteus displayed.
 Force offset changed at test start (≈ −3.0 kN before, ≈ −0.3 kN while moving) — internal tare or
 hydraulic effect, unknown.
 
-### Real test (concrete cube 150 mm), 2026-10-19, `captures/20261019_143520_step15_real_test.*`
+### Real test (concrete cube 150 mm), 2026-10-19, `data/captures/20261019_143520_step15_real_test.*`
 
 Start-up identical for the 3rd time. Then (t = seconds from recording start):
 
@@ -190,7 +190,7 @@ channel, numbered as in the stream: µm/s and µm on Path (channel 1), N/s and N
 | Test | Template speed | Command | Measured path rate |
 |---|---|---|---|
 | step 15 (full test) | 10 mm/min | `#D12167;0;100000;0;1` | 2.06 mm/min |
-| step 16 (`captures/20261019_150027_step16_ramp_6mm_min.*`) | 6 mm/min | `#D12100;79446;100000;0;1` | ≈ 6 mm/min (6.6 → 5.0 as load rose) |
+| step 16 (`data/captures/20261019_150027_step16_ramp_6mm_min.*`) | 6 mm/min | `#D12100;79446;100000;0;1` | ≈ 6 mm/min (6.6 → 5.0 as load rose) |
 
 | Field | Meaning | Status |
 |---|---|---|
@@ -201,7 +201,7 @@ channel, numbered as in the stream: µm/s and µm on Path (channel 1), N/s and N
 | `0` | ? | unknown |
 | channel | the controlled channel, as numbered in the stream: **1 = Path, 0 = Force** | **confirmed** (step 20) |
 
-**Step 17** (first live run of the monitor, `captures/20261019_155241_step17_live_monitor_3mm_min.jsonl`,
+**Step 17** (first live run of the monitor, `data/captures/20261019_155241_step17_live_monitor_3mm_min.jsonl`,
 template 3 mm/min): `#D1250;159202;100000;0;1` — speed 50 µm/s = 3 mm/min, but start **159.202 mm =
 exactly 2 × the piston position (79.6005 mm)**, past the end. The press ran at the set **3.0 mm/min**
 (measured 2.7–3.1 mm/min over the ramp). Start-up of this Proteus session was in the previous capture;
@@ -214,7 +214,7 @@ this was its first test.
 | step 17 | 2× | 3.0 / 3 mm/min |
 | step 18 | 0× (0 mm) | **1.016 / 1 mm/min** |
 
-**Step 18** (`captures/20261019_160140_step18_live_monitor_1mm_min.jsonl`, first test after
+**Step 18** (`data/captures/20261019_160140_step18_live_monitor_1mm_min.jsonl`, first test after
 Proteus start-up, template 1 mm/min): `#D1217;0;100000;0;1` — start **0** again, as in step 15, yet
 the press ran at the **set speed** (1.016 mm/min measured over 56 s). So the start field does not
 explain step 15's slow ramp either way; it seems to be ignored or harmless. **Step 15 remains the only
@@ -222,7 +222,7 @@ ramp that ran slow** (2.06 / 10 mm/min, from its first second and at 11 kN, so n
 load). Open: whether the press can run a 10 mm/min path ramp at all — repeat at 10 mm/min.
 Step 18 also had three Stop presses (`#B18` ×3) before Cancel.
 
-**Step 19** (`captures/20261019_161427_step19_live_10mm_min.jsonl`, template 10 mm/min, a soft or
+**Step 19** (`data/captures/20261019_161427_step19_live_10mm_min.jsonl`, template 10 mm/min, a soft or
 yielding specimen): force rose from ~0 to 3.8 kN at 45.25 mm and the controller reported the start load
 (`#B01`, 0.1 % of 4000 kN = 4 kN). After CONTINUE the ramp `#D12167;0;100000;0;1` was sent with the
 piston at 48.295 mm — start **0** again — and the press ran at **9.86 mm/min** (least squares over 51 s;
@@ -233,7 +233,7 @@ piston at 48.295 mm — start **0** again — and the press ran at **9.86 mm/min
 |---|---|---|
 | step 19 | 0× (0 mm) | 9.86 / 10 mm/min |
 
-**Step 20 — force control** (`captures/20261019_163951_step20_force_5kN_s.jsonl`, template Ramp
+**Step 20 — force control** (`data/captures/20261019_163951_step20_force_5kN_s.jsonl`, template Ramp
 Control **Force, 5 kN/s, End 300 kN**, a 150 mm cube, stopped by the operator at 247 kN; the cube
 survived). Everything up to CONTINUE was the path test's sequence (`#B47` … `#B23`, `#B01` at the start
 load, `#D0520`), then `#D125000;0;300000;0;0`, `#B35`, `#B22`, `#O`. Force rose at **5.03 kN/s**
@@ -241,7 +241,7 @@ load, `#D0520`), then `#D125000;0;300000;0;0`, `#B35`, `#B22`, `#O`. Force rose 
 for both modes: the last field selects the channel, and the numbers are in thousandths of its unit.
 
 
-**Step 21 — a force ramp left to reach its end** (`captures/20261019_165004_step21_force_2kN_s_to_end.jsonl`,
+**Step 21 — a force ramp left to reach its end** (`data/captures/20261019_165004_step21_force_2kN_s_to_end.jsonl`,
 template Force **2 kN/s, End 100 kN**, the same cube; it survived). Ramp `#D122000;0;100000;0;0` — the
 second force rate confirms the unit (2000 = 2 kN/s, measured 2.01 kN/s). At **99.67 kN** the
 controller sent **`#B02` — ramp end reached** (new, controller-initiated); **10 ms later Proteus sent
@@ -249,13 +249,13 @@ controller sent **`#B02` — ramp end reached** (new, controller-initiated); **1
 and **`#B17`** (Cancel), and the load was released (98 → 2 kN within 3 s). The operator pressed
 nothing: **a force test ends by itself at its end force**, with Proteus driving the end.
 
-**Step 22 — a path ramp at 120 mm/min by mistake** (`captures/20261019_170350_step22_path_120mm_min_pause_lag.jsonl`):
+**Step 22 — a path ramp at 120 mm/min by mistake** (`data/captures/20261019_170350_step22_path_120mm_min_pause_lag.jsonl`):
 the template was on Path with 2 mm/**s** instead of 2 mm/min, so Proteus sent `#D122000;0;100000;0;1`
 (2000 µm/s). On the cube the piston followed only about **20 mm/min** (17 mm/min fitted) and force rose
 at ~65 kN/s. The operator pressed Stop (`#B18`) at 174 kN — and **the load kept rising to 464 kN** for
 4.4 s, the piston moving another 1.6 mm, until Cancel (`#B17`) released it (464 → 34 kN in 1.5 s).
 
-**Step 23 — PAUSE / CONTINUE** (`captures/20261019_170652_step23_path_2mm_min_pause_resume.jsonl`,
+**Step 23 — PAUSE / CONTINUE** (`data/captures/20261019_170652_step23_path_2mm_min_pause_resume.jsonl`,
 Path 2 mm/min, `#D1233;0;100000;0;1`): `#B18` four times — the force held at ~100 kN, rose again to
 208 kN, held at ~190 kN, rose to 282 kN — then Cancel. **`#B18` toggles pause and continue**: one
 button in Proteus, one command (operator). Measured with the paused time left out, the ramp ran at
@@ -297,7 +297,7 @@ specimen) and keypad STOP `#B28` → Proteus `#B36` `#B17`, controller `#B43`. S
 sequence because the keypad STOP had stopped it. `#B01` at 4.01 kN, CONTINUE (`#D0520`, ramp, `#B35`,
 `#B22`, `#O`), Stop `#B18` at 565 kN, Cancel `#B17`, controller `#B43` 20 s later, Exit `#B36` `#B21`.
 
-### Exit + controller STOP (return to bottom), 2026-10-16, `captures/20261016_172650_step14_exit_sinking.*`
+### Exit + controller STOP (return to bottom), 2026-10-16, `data/captures/20261016_172650_step14_exit_sinking.*`
 
 Operator procedure after a test: exit the test in Proteus, then press **STOP on the controller**
 → display shows **SINKING** and the piston returns down.
@@ -313,12 +313,12 @@ Operator procedure after a test: exit the test in Proteus, then press **STOP on 
 ### Actions that send nothing
 
 - **Reset** (Proteus measurement window), 2026-10-16 step 12.
-- **Zero** (Proteus measurement window), 2026-10-16, `captures/20261016_162626_step9_zero.*`: no PC→CTRL bytes;
+- **Zero** (Proteus measurement window), 2026-10-16, `data/captures/20261016_162626_step9_zero.*`: no PC→CTRL bytes;
   raw stream continued unchanged (force −6.3 kN, no jump); controller display unchanged while
   Proteus showed 0.0. → **Zero is a software tare inside Proteus.** A replacement app must do its own
   tare (subtract the raw value at the moment of zeroing).
 
-### Break identification on, 2026-10-20, `captures/20261020_101100_step26_break_threshold_10_25.jsonl`
+### Break identification on, 2026-10-20, `data/captures/20261020_101100_step26_break_threshold_10_25.jsonl`
 
 The template's **Break identification (Servo)** ticked, threshold 10 ‰, then 25 ‰; each time START
 without a specimen and Cancel after the start load. Proteus sent at START:
@@ -330,7 +330,7 @@ controller answered neither. Both approaches ended against something at **67.1 m
 3.6 kN, the force overshooting to **19.7 kN** within 2 s and settling at ~11.7 kN until Cancel —
 the "20 kN" the operator sees at the start load is this overshoot, not a setting.
 
-### The first test from this program, 2026-10-20, `captures/20261020_103911_step27_first_test_from_control_mode.jsonl`
+### The first test from this program, 2026-10-20, `data/captures/20261020_103911_step27_first_test_from_control_mode.jsonl`
 
 Control mode (COM7, no Proteus), break detection on (10 ‰), Path 2 mm/min to 100 mm. START →
 `#B47` `#O` `#B30` `#B33` `#D21100` `#D0910` `#B23`; `#B01` at 67.1 mm, 3.8 kN; CONTINUE →
@@ -350,9 +350,9 @@ Step 27's ramp, `#D1233;0;100000;0;1` (2 mm/min) on the specimen at 67 mm, ran a
 (force 0.88 kN/s), where Proteus' identical line in step 23 ran at 2.10. Measured over the same window
 (3–22 s after `#B22`) in every case below.
 
-- Step 28 (`captures/20261020_104728_step28_path_2mm_min_break_detection_off.jsonl`), break detection
+- Step 28 (`data/captures/20261020_104728_step28_path_2mm_min_break_detection_off.jsonl`), break detection
   off: **2.12 mm/min**. That looked like break detection was the cause — **it was not**:
-- Step 29 (`captures/20261020_105603_step29_break_detection_off_then_on.jsonl`), one session, two tests
+- Step 29 (`data/captures/20261020_105603_step29_break_detection_off_then_on.jsonl`), one session, two tests
   differing only in the switch, CONTINUE ~9 s after the start load in both: off **2.10 mm/min**, on
   **2.15 mm/min**. The operator doubted step 28's conclusion and was right.
 
@@ -378,7 +378,7 @@ operator's STOP 13 s later released it (370 → 1.4 kN in 4 s) and the piston sa
 stopped the sinking — as step 33. STOP pressed twice without load also sank the piston (−8 to −12
 mm/min), and once more stopped it. Two keypad STOPs during the session were answered as designed.
 
-### After a break, a second Cancel releases the load, 2026-10-20, `captures/20261020_112855_step33_second_cancel_releases_after_break.jsonl`
+### After a break, a second Cancel releases the load, 2026-10-20, `data/captures/20261020_112855_step33_second_cancel_releases_after_break.jsonl`
 
 Control mode, break detection on (10 ‰), Path 2 mm/min, a cube that failed gradually: peak **533.8
 kN**, then `#B27` at **496 kN** (≈ 38 kN down); `#B17` 30 ms later (automatic); `#B43` at once; the
@@ -386,7 +386,7 @@ pump stopped and **the load was held at ~450 kN**, as in step 32. 10 s later the
 — **a second `#B17` — and the load came off**: 448 → 218 kN in 0.4 s, under 5 kN in 2 s, the piston
 retracting. **After a break: the first Cancel stops the pump, the second releases the load.**
 
-### A cube to failure with break detection on, 2026-10-20, `captures/20261020_111756_step32_cube_to_failure_break_detection_on.jsonl`
+### A cube to failure with break detection on, 2026-10-20, `data/captures/20261020_111756_step32_cube_to_failure_break_detection_on.jsonl`
 
 Control mode, break detection on (10 ‰), Path 2 mm/min (ran at 2.07 mm/min, 12 kN/s), a fresh 150 mm
 cube. **Peak 1908.9 kN**; the force fell to 1879 kN over a second, then the controller sent **`#B27`**
@@ -403,7 +403,7 @@ not known. What is known to release the load after a break: PC mode off, then th
 Whether a second `#B17` would release it is untested; on `#B27` control mode now sends `#B17` and
 stays connected, so the next cube can try STOP in the program, then Disconnect and the keypad STOP.
 
-### Ramp end and keypad STOP from control mode, 2026-10-20, `captures/20261020_110938_step31_force_ramp_end_and_keypad_stop.jsonl`
+### Ramp end and keypad STOP from control mode, 2026-10-20, `data/captures/20261020_110938_step31_force_ramp_end_and_keypad_stop.jsonl`
 
 Control mode, Force 2 kN/s to 100 kN, break detection on, a specimen at 67.1 mm.
 
@@ -430,7 +430,7 @@ Control mode, Force 2 kN/s to 100 kN, break detection on, a specimen at 67.1 mm.
   67.39 mm are near the force after the STOP and the piston's position; what exactly the controller
   records is not known. Control mode, no longer connected, only logs them.
 
-### Two program bugs, failing safe, 2026-10-20, `captures/20261020_110322_step30_split_reply_and_connect_race.jsonl`
+### Two program bugs, failing safe, 2026-10-20, `data/captures/20261020_110322_step30_split_reply_and_connect_race.jsonl`
 
 - **Connect aborted** after a correct start-up answer: `#B40` took 60 ms to write over USB, the
   controller's `#D138.6` (to `#B50`) arrived meanwhile and was handed to the window but not to the
@@ -448,7 +448,7 @@ Control mode, Force 2 kN/s to 100 kN, break detection on, a specimen at 67.1 mm.
 
 Nothing moved in either case.
 
-### Control mode: this program in Proteus' place, 2026-10-19, `captures/20261019_174926_step24_control_connect.jsonl`, `…175412_step25_control_connect_again.jsonl`
+### Control mode: this program in Proteus' place, 2026-10-19, `data/captures/20261019_174926_step24_control_connect.jsonl`, `…175412_step25_control_connect_again.jsonl`
 
 The old PC unplugged; the controller cable straight into a Digitus adapter (COM7). This program sent
 Proteus' start-up byte for byte and the controller answered **exactly as it answered Proteus in every

@@ -142,7 +142,7 @@ class Settings:
 
     data_dir: str = ""
     """Where the monitor writes: ``captures/`` (every byte heard) and ``tests/``
-    (one CSV per test). Blank until the operator picks one."""
+    (one CSV per test). Blank until set: then ``Documents/PressController``."""
 
     control_port: str = ""
     """The serial port the controller cable is plugged into in control mode

@@ -23,8 +23,9 @@ tools/       sniff.py, the bench sniffer the protocol was learnt with
 docs/        protocol notes, the tap's wiring (PDF and its generator), these topics
 examples/    press.example.toml, with placeholder ports
 tests/       unit and offscreen UI tests; tests/data holds real captures
-captures/    the recordings the protocol notes cite
-data/        the lab's own press file (git-ignored)
+data/        git-ignored: the lab's own press file, the Proteus CD, and
+             data/captures/, the recordings the protocol notes cite (kept
+             out of the repository, operator 2026-10-20)
 ```
 
 ## Dependency direction
