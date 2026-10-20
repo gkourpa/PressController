@@ -344,15 +344,25 @@ Never seen before — every earlier test had break detection off. The drop match
 never had 40 kN to lose, and no `#B27` came. → **`#B27` = break detected** (hypothesis: the force
 fell by the threshold from its peak). During a test, control mode answers it with STOP.
 
-### Break detection slows a path ramp, 2026-10-20, `captures/20261020_104728_step28_path_2mm_min_break_detection_off.jsonl`
+### A slow ramp, and break detection ruled out, 2026-10-20, steps 28 and 29
 
-Step 27's ramp, `#D1233;0;100000;0;1` (2 mm/min) on the same specimen at 67 mm, ran at only
-**0.74 mm/min** (force 0.88 kN/s), where Proteus' identical line in step 23 ran at 2.10 mm/min. Step
-28 repeated it from control mode with **break detection off** (`#B32`, no `#D21`) and CONTINUE 9 s
-after the start load: **2.12 mm/min** (3.35 kN/s) — as Proteus. Measured over the same window (3–22 s
-after `#B22`) in all three. So with break detection on (`#B33` `#D21100`) **the controller ran the path
-ramp at about a third of its speed**. Why is not known; Proteus never ran a ramp with break detection
-on in any recording.
+Step 27's ramp, `#D1233;0;100000;0;1` (2 mm/min) on the specimen at 67 mm, ran at only **0.74 mm/min**
+(force 0.88 kN/s), where Proteus' identical line in step 23 ran at 2.10. Measured over the same window
+(3–22 s after `#B22`) in every case below.
+
+- Step 28 (`captures/20261020_104728_step28_path_2mm_min_break_detection_off.jsonl`), break detection
+  off: **2.12 mm/min**. That looked like break detection was the cause — **it was not**:
+- Step 29 (`captures/20261020_105603_step29_break_detection_off_then_on.jsonl`), one session, two tests
+  differing only in the switch, CONTINUE ~9 s after the start load in both: off **2.10 mm/min**, on
+  **2.15 mm/min**. The operator doubted step 28's conclusion and was right.
+
+Step 27 sent the same lines in the same order as step 29's second test. **What slowed step 27 is not
+known and was not in what was sent**; its only visible difference is a longer wait at the start load
+(16.6 s, against 6–9 s). The monitor's measured rate is what showed it, and is how it would be caught
+again.
+
+`#B27` again: step 29's second test (break detection on) got `#B27` 0.5 s after STOP as the force fell
+104 → 63 kN (41 kN); the first (off), stopped at the same 104 kN, got nothing.
 
 Proteus' own path ramps under load also show a ceiling (break detection off): 10 mm/min ran at 2.23
 (step 15), 3 at 2.33 (step 17), 2 at 2.09 (23), 1 at 1.11 (18); only step 19, without load, ran 10 at
@@ -442,7 +452,7 @@ validity question and "keep measuring" send nothing.
 |---|---|---|---|
 | `#B01` | CTRL | start load reached | confirmed |
 | `#B02` | CTRL | ramp end reached (force ramp at its end force) | confirmed (step 21) |
-| `#B27` | CTRL | break detected: with break detection on, the force fell by the threshold (10 ‰ of range = 40 kN) from its peak | hypothesis (step 27) |
+| `#B27` | CTRL | break detected: with break detection on, the force fell by the threshold (10 ‰ of range = 40 kN) from its peak | hypothesis (steps 27, 29: only with break detection on, at a 40–41 kN drop) |
 | `#B28` | CTRL | keypad STOP pressed (in PC mode, not obeyed locally) | confirmed |
 | `#B35` | CTRL | answer to the ramp definition | hypothesis |
 | `#B43` | CTRL | test over, load released | hypothesis |
@@ -495,7 +505,7 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 - Which start-up command makes **PC** / **FO** appear on the controller display.
 - Meaning of display indicators ZB, (bottom) FO, LD.
 - What Proteus puts in the ramp's start field (0×, 1×, 2×, 0×, 0× the piston position in steps 15–19); it does not affect the speed (steps 17–19).
-- Why break detection on (`#B33` `#D21…`) runs a path ramp at about a third of its speed (steps 27, 28), and whether the threshold or break detection itself does it.
+- Why step 27's 2 mm/min ramp ran at 0.74 mm/min with exactly the lines that ran at 2.15 in step 29 (not break detection: step 29).
 - What limits a path ramp under load to about 2.3 mm/min (steps 15, 17); step 19 ran 10 mm/min without load.
 - Ramp field 4 (`0`) and whether field 5 changes with Force/Deformation control.
 - Whether `#B27` (step 27) is the break report at a real failure, and whether the controller stops the pump by itself on it.
