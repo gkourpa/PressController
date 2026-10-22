@@ -132,7 +132,8 @@ piston sinks, the next stops the sinking (step 33).
 **Settings…** (File menu, both windows, as DAqReader's): the screen's redraw
 ceiling, control mode's port, and the test — Proteus' template: Peak, break
 detection and its threshold, the start load, the ramp (Path and Force speed and
-end) and its measuring interval. Saved to the global settings file only on OK;
+end), its measuring interval, and the measuring interval before the ramp
+(both 100–500 ms). Saved to the global settings file only on OK;
 locked during a test.
 
 ## The window's frame (operator, 2026-10-20)

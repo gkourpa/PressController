@@ -38,6 +38,11 @@ off and PC mode off, as Proteus does when it exits.
 
 **A test** (docs/motion.md), Proteus' sequence line for line:
 
+* **The measuring interval before the ramp**
+  (:attr:`ControllerSession.idle_interval_ms`): the start-up sets 100 ms; a
+  different setting is sent once connected, and after every test, since the
+  ramp's ``#D05…`` stays in force when the test ends. Nothing is sent when
+  the interval in force is already the one wanted.
 * :meth:`ControllerSession.start_test` builds every line the test will need
   from the settings first — the ramp against the press file's limits — and
   sends nothing if one is refused. Then ``#B47``; on the controller's ``#O``,
@@ -164,6 +169,11 @@ class ControllerSession:
         """Peak detection as the operator wants it; sent on connect and on change."""
         self.break_detection = True
         """Break detection as the operator wants it; sent on connect and on change."""
+        self.idle_interval_ms = cmd.STARTUP_INTERVAL_MS
+        """The measuring interval wanted before the ramp; sent on connect if
+        not the start-up's, and after every test."""
+        self._interval_ms = 0
+        """The interval in force, as last sent; 0 when unknown."""
         self.test = RunPhase.NONE
         self.plan: RunLines | None = None
         """The running test's lines; ``None`` between tests."""
@@ -230,6 +240,24 @@ class ControllerSession:
         if self.state is SessionState.CONNECTED:
             self.link.send(cmd.BREAK_ON if self.break_detection else cmd.BREAK_OFF)
 
+    def set_idle_interval(self, ms: int) -> None:
+        """Want ``ms`` before the ramp; sent now if connected and no test runs."""
+        self.idle_interval_ms = int(ms)
+        if self.test is RunPhase.NONE:
+            self._restore_interval()
+
+    def _restore_interval(self) -> None:
+        """Send the interval wanted before the ramp, unless already in force."""
+        if self.state is not SessionState.CONNECTED or self._interval_ms == self.idle_interval_ms:
+            return
+        try:
+            line = cmd.interval_line(self.idle_interval_ms)
+        except NotAllowed as exc:
+            self._say(f"Measuring interval not sent: {exc}.", "error")
+            return
+        self.link.send(line)
+        self._interval_ms = self.idle_interval_ms
+
     def _apply_switches(self) -> None:
         self.link.send(cmd.PEAK_ON if self.peak else cmd.PEAK_OFF)
         self.link.send(cmd.BREAK_ON if self.break_detection else cmd.BREAK_OFF)
@@ -281,6 +309,7 @@ class ControllerSession:
             return False
         if self.test is RunPhase.AT_START_LOAD and self.plan is not None:
             self.link.send(self.plan.interval)
+            self._interval_ms = int(self.plan.interval[4:]) * 10
             self.link.send(self.plan.ramp)
             self._expect(RunPhase.STARTING_RAMP, "#B35")
             return True
@@ -308,6 +337,7 @@ class ControllerSession:
         self.link.send(cmd.CANCEL)
         was = self.test
         self._end_test()
+        self._restore_interval()
         self._say("STOP: pump off, load released (Cancel)." if was in RUNNING
                   else "STOP sent (Cancel): pump off.", "warn")
         return True
@@ -325,6 +355,7 @@ class ControllerSession:
     def _stop_for(self, why: str) -> None:
         self.link.send(cmd.CANCEL)
         self._end_test()
+        self._restore_interval()
         self._say(f"Test stopped (Cancel: pump off): {why}.", "error")
 
     def _heard_in_test(self, ev: TapEvent, msg) -> None:
@@ -352,6 +383,7 @@ class ControllerSession:
             # stays connected and STOP stays available.
             self.link.send(cmd.CANCEL)
             self._end_test()
+            self._restore_interval()
             self._say("The controller reported a break (#B27): pump off. The load may still be "
                       "held — press STOP to release it. If it does not come off within a few "
                       "seconds, press Disconnect, then STOP on the controller's keypad.",
@@ -370,6 +402,7 @@ class ControllerSession:
         elif msg.code == 2 and self.test in (RunPhase.RAMP, RunPhase.PAUSED):
             self._send_all((cmd.RAMP_END_ANSWER, cmd.CANCEL))
             self._end_test()
+            self._restore_interval()
             self._say("The ramp reached its end: answered as Proteus does (#B26), pump off.")
 
     # ---- the tick ------------------------------------------------------------
@@ -424,7 +457,9 @@ class ControllerSession:
                     self.state = SessionState.CONNECTED
                     self._last_sample = now
                     self._silent_said = False
+                    self._interval_ms = cmd.STARTUP_INTERVAL_MS
                     self._apply_switches()
+                    self._restore_interval()
                     self._say("Connected: the controller is in PC mode and streaming; Peak "
                               f"{'on' if self.peak else 'off'}, break detection "
                               f"{'on' if self.break_detection else 'off'}. START begins a "

@@ -2,7 +2,14 @@
 
 What each version added or changed, newest first.
 
-## Unreleased
+## 0.1.1 — 2026-10-22
+
+### Added
+
+- **Measuring interval before the ramp** (Settings → Test, 100 ms): sent once
+  connected and after every test, so idle and the approach run at a chosen
+  rate. Proteus left the ramp's 200 ms in force after a test; this program
+  sets it back.
 
 ### Fixed
 
@@ -13,6 +20,9 @@ What each version added or changed, newest first.
 
 - The status card takes the left column's spare height, so the column fills
   the window.
+- Measuring intervals are limited to **100–500 ms** (was 50–1000 ms): nothing
+  faster than 100 ms has ever been seen from the controller.
+- After Connect the message no longer says that no motion command can be sent.
 
 ## 0.1.0 — 2026-10-20
 

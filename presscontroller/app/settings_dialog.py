@@ -219,6 +219,11 @@ class SettingsDialog(QDialog):
         self.interval.setSingleStep(10)
         self.interval.setSuffix(" ms")
         self.interval.setValue(t.measuring_interval_ms)
+        self.idle_interval = QSpinBox()
+        self.idle_interval.setRange(MIN_INTERVAL_MS, MAX_INTERVAL_MS)
+        self.idle_interval.setSingleStep(10)
+        self.idle_interval.setSuffix(" ms")
+        self.idle_interval.setValue(t.idle_interval_ms)
         test = QFormLayout()
         test.addRow(self.peak)
         test.addRow(self.break_detection)
@@ -229,6 +234,7 @@ class SettingsDialog(QDialog):
         test.addRow("Path ramp: end", self.path_end)
         test.addRow("Force ramp: speed", self.force_speed)
         test.addRow("Force ramp: end", self.force_end)
+        test.addRow("Measuring interval before the ramp", self.idle_interval)
         test.addRow("Measuring interval during the ramp", self.interval)
 
         # ---- Plot ----------------------------------------------------------------
@@ -257,8 +263,9 @@ class SettingsDialog(QDialog):
         self.tabs.addTab(_page(test, "Peak and Break detection are also the control "
                                      "window's switches; a flip there is remembered here. "
                                      "START refuses a ramp faster than the press file's "
-                                     "[limits] and says so. The measuring interval is "
-                                     "rounded to 10 ms."), TABS[2])
+                                     "[limits] and says so. The measuring intervals are "
+                                     "rounded to 10 ms; 100 ms is the fastest the "
+                                     "controller has been seen to send."), TABS[2])
         self.tabs.addTab(_page(plot, "Auto fits the axis to the test's data; a fixed range "
                                      "keeps it still while the test runs."), TABS[3])
 
@@ -316,7 +323,9 @@ class SettingsDialog(QDialog):
             f"{'#000' if QColor(self._colour).lightness() > 140 else '#fff'}; }}")
 
     def _accept(self) -> None:
-        interval = int(round(self.interval.value() / 10.0)) * 10
+        def tens(ms: int) -> int:
+            return min(MAX_INTERVAL_MS, max(MIN_INTERVAL_MS, int(round(ms / 10.0)) * 10))
+
         test = TemplateSettings(
             peak=self.peak.isChecked(),
             break_detection=self.break_detection.isChecked(),
@@ -327,7 +336,8 @@ class SettingsDialog(QDialog):
             path_end_mm=self.path_end.value(),
             force_speed_kn_s=self.force_speed.value(),
             force_end_kn=self.force_end.value(),
-            measuring_interval_ms=min(MAX_INTERVAL_MS, max(MIN_INTERVAL_MS, interval)))
+            measuring_interval_ms=tens(self.interval.value()),
+            idle_interval_ms=tens(self.idle_interval.value()))
         self.settings = replace(
             self.settings, refresh_hz=float(self.refresh.value()),
             theme=self.theme.currentData(), data_dir=self._data_dir,

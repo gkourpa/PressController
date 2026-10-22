@@ -19,7 +19,7 @@ Two kinds of line, both checked by :func:`check` at the one place a byte leaves
                                             end within the channel's range
   ``#D09<n>``                               start load, n × 0.01 % of the force range,
                                             n = 1–100
-  ``#D05<n>``                               stream interval n × 10 ms, n = 5–100
+  ``#D05<n>``                               stream interval n × 10 ms, n = 10–50
   ``#D21<n>``                               break threshold n × 0.1 ‰, n = 10–1000
   ========================================  ==========================================
 
@@ -59,6 +59,9 @@ STARTUP_REPLIES: tuple[tuple[str, ...], ...] = (
     ("#D140", "#D180"),
     (),
 )
+
+#: The interval the start-up sets (``#D0510``, above).
+STARTUP_INTERVAL_MS = 100
 
 STREAM_ON = "#B37"
 STREAM_OFF = "#B36"

@@ -48,10 +48,22 @@ dialog edits it; every value is checked when read and when entered.
 | Ramp: speed | 2 mm/min (Path), 2 kN/s (Force) | in the ramp |
 | Ramp: end | 100 mm (Path), 100 kN (Force) | in the ramp |
 | Ramp: measuring interval | 200 ms | `#D05…` |
+| Measuring interval before the ramp | 100 ms (the start-up's) | `#D05…` after Connect and after each test, only when not already in force — ours, not Proteus' (below) |
 | Screen refresh | 2 Hz | nothing (the window's redraw) |
 
 The ramp is also editable in the control window before START, and what is
 entered there is remembered.
+
+**The interval before the ramp** (operator, 2026-10-22). Proteus sets 100 ms at
+start-up and the ramp's interval at CONTINUE, and **never sets it back**: after a
+test the stream stays at the ramp's rate, and in step 16 its next approach ran at
+200 ms (every Proteus recording checked). This program sends the setting's
+`#D05…` once connected if it is not the start-up's 100 ms, and **after every
+test whose ramp had started** — right after the test's last `#B17` — so idle and
+the next approach always run at the chosen rate. That position after `#B17` is
+ours alone; the line is one the controller has taken both idle (start-up) and in
+a test (CONTINUE). To be checked at the press: after a test, the stream's
+counter steps by 10 again (100 ms).
 
 **The switches are obeyed, never reset.** The Peak and Break detection switches
 in the control window show the saved setting when the window opens; flipping one
@@ -71,7 +83,7 @@ point:**
 | --- | --- |
 | `#D12<speed>;0;<end>;0;<channel>` | channel `1` (Path) or `0` (Force), never Deformation; speed above 0 and **at most the press file's `[limits]`** (10 mm/min, 15 kN/s); end above 0 and within the channel's range; start always `0` (it does not change the speed — steps 17–19) |
 | `#D09<n>` | start load 0.01–1.00 % of the force range (n = 1–100); 0.10 % = Proteus' |
-| `#D05<n>` | measuring interval 50–1000 ms in 10 ms steps (n = 5–100); 100 ms (`#D0510`) and 200 ms (`#D0520`) are recorded |
+| `#D05<n>` | measuring interval 100–500 ms in 10 ms steps (n = 10–50); 100 ms (`#D0510`) and 200 ms (`#D0520`) are recorded. Narrowed from 50–1000 ms on 2026-10-22 (operator): faster than 100 ms was never seen (one stream line takes ~39 ms at 9600 baud), and 500 ms still leaves three lines inside the 1.5 s a test may go without one |
 | `#D21<n>` | break threshold 1.0–100.0 ‰ in 0.1 ‰ steps (n = 10–1000), sent only right after `#B33`; 10 ‰ and 25 ‰ are recorded |
 
 Anything else is refused before a byte is written.
@@ -137,6 +149,8 @@ following our own test as it follows Proteus'.
    answers `#B02` with `#B26 #B17` (as step 21).
 4. **Keypad STOP** during a ramp → pump off, keypad in charge.
 Steps 1–4 done on 2026-10-20 (steps 27–31 in docs/PROTOCOL.md).
+Next session (0.1.1): after any test that reached the ramp, the recording shows
+`#D0510` after the last `#B17` and the stream back at 100 ms.
 
 5. **A cube to failure, break detection ON**: done (step 32) — peak 1908.9 kN,
    `#B27` at the break; the load stayed held after Cancel until PC mode was off

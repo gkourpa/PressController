@@ -59,8 +59,11 @@ RAMP_CONTROL_LABELS = {"path": "Path", "force": "Force"}
 MIN_BREAK_THRESHOLD, MAX_BREAK_THRESHOLD = 1.0, 100.0
 #: Start load, in % of the force range; sent as hundredths of a percent.
 MIN_START_LOAD, MAX_START_LOAD = 0.01, 1.0
-#: Measuring interval during the ramp, ms; sent in 10 ms steps.
-MIN_INTERVAL_MS, MAX_INTERVAL_MS = 50, 1000
+#: Measuring interval, ms; sent in 10 ms steps. 100 ms is the fastest the
+#: controller has ever been seen to send (Proteus' start-up; one line takes
+#: ~39 ms at 9600 baud), and 500 ms leaves three lines inside the 1.5 s a test
+#: may go without one (operator, 2026-10-22: no rate never seen).
+MIN_INTERVAL_MS, MAX_INTERVAL_MS = 100, 500
 
 
 def clamp_refresh_hz(hz: float) -> float:
@@ -100,6 +103,11 @@ class TemplateSettings:
     measuring_interval_ms: int = 200
     """The stream's interval during the ramp; sent as ``#D05<÷ 10>``."""
 
+    idle_interval_ms: int = 100
+    """The stream's interval before the ramp -- idle and the approach. The
+    start-up sets 100 ms (``#D0510``); another value is sent after Connect,
+    and this one again after every test (which leaves the ramp's in force)."""
+
     def problems(self) -> list[str]:
         """Every value outside what may be sent, said in words."""
         out = []
@@ -118,10 +126,11 @@ class TemplateSettings:
                             ("force end", self.force_end_kn)):
             if value <= 0:
                 out.append(f"{name} must be above zero, not {value:g}")
-        if (not MIN_INTERVAL_MS <= self.measuring_interval_ms <= MAX_INTERVAL_MS
-                or self.measuring_interval_ms % 10):
-            out.append(f"measuring interval {self.measuring_interval_ms} ms is not a "
-                       f"multiple of 10 ms within {MIN_INTERVAL_MS}–{MAX_INTERVAL_MS} ms")
+        for name, ms in (("measuring interval", self.measuring_interval_ms),
+                         ("measuring interval before the ramp", self.idle_interval_ms)):
+            if not MIN_INTERVAL_MS <= ms <= MAX_INTERVAL_MS or ms % 10:
+                out.append(f"{name} {ms} ms is not a multiple of 10 ms within "
+                           f"{MIN_INTERVAL_MS}–{MAX_INTERVAL_MS} ms")
         return out
 
 
@@ -193,6 +202,7 @@ class Settings:
             f"force_speed_kn_s = {toml_value(t.force_speed_kn_s)}",
             f"force_end_kn = {toml_value(t.force_end_kn)}",
             f"measuring_interval_ms = {toml_value(t.measuring_interval_ms)}",
+            f"idle_interval_ms = {toml_value(t.idle_interval_ms)}",
             "",
             "# The force-displacement plot. An axis range left out is fitted to the data.",
             "[plot]",

@@ -69,6 +69,7 @@ class ControlWindow(MainWindow):
         super().__init__(monitor, session, **kw)
         t = self.settings.test
         session.peak, session.break_detection = t.peak, t.break_detection
+        session.idle_interval_ms = t.idle_interval_ms
 
         # ---- the connection bar --------------------------------------------
         self.state_lbl = _bold(QLabel())
@@ -195,6 +196,7 @@ class ControlWindow(MainWindow):
         for sw, on in ((self.peak_switch, t.peak), (self.break_switch, t.break_detection)):
             if sw.isChecked() != on:
                 sw.setChecked(on)           # obeyed: sent now if connected
+        self.session.set_idle_interval(t.idle_interval_ms)
         self._load_ramp()
         self._update_controls()
 

@@ -257,7 +257,7 @@ def test_a_test_run_from_the_buttons(qapp, press, monkeypatch):
         assert s.test is RunPhase.RAMP
         win._esc.activated.emit()               # Esc is STOP
         win.tick()
-        assert s.test is RunPhase.NONE and fake.written[-1] == "#B17"
+        assert s.test is RunPhase.NONE and fake.written[-2:] == ["#B17", "#D0510"]
         assert win.start_btn.isEnabled()
     finally:
         win.close()
@@ -432,3 +432,18 @@ def test_the_left_column_fills_the_height(qapp, press):
         assert abs(bottom - plot) < 80          # the column ends near where the plot ends
     finally:
         win.close()
+
+
+def test_the_settings_dialog_saves_both_intervals_within_100_to_500_ms(qapp):
+    from presscontroller.app.settings_dialog import SettingsDialog
+    from presscontroller.config.settings import Settings
+    saved = []
+    dlg = SettingsDialog(Settings(), save=saved.append).show_tab("Test")
+    assert (dlg.idle_interval.value(), dlg.interval.value()) == (100, 200)
+    assert (dlg.idle_interval.minimum(), dlg.idle_interval.maximum()) == (100, 500)
+    assert (dlg.interval.minimum(), dlg.interval.maximum()) == (100, 500)
+    dlg.idle_interval.setValue(50)                # clamped to the fastest ever seen
+    assert dlg.idle_interval.value() == 100
+    dlg.idle_interval.setValue(254)
+    dlg._accept()
+    assert saved[-1].test.idle_interval_ms == 250
