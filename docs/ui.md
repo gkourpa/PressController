@@ -85,13 +85,17 @@ nothing and would have taught them to ignore the one warning that matters.
 ## Saving
 
 Every test is saved to `<data>/tests/test_<START time>.csv` without being
-asked, **while it runs** (operator, 2026-10-22): from START the file is rewritten
-every 5 s, atomically, so a crash or a power cut leaves the last whole version
-(its last line then reads `closed: still open when saved`). When the test
-closes — the load released (`#B43`), the next START, PC mode off, or the window
-closing — the same file is written a last time. If it is held open in another
-program (Excel), a running save is retried and said once, and the closing save
-goes to a new file (`_2`).
+asked, **streamed while it runs** (operator, 2026-10-22): the file opens with the
+test's first measurement, its `#` head (the press, START, the resolution and
+each channel's range) first, and **every measurement adds a row at once**, so
+a crash or a power cut loses nothing already heard. The file is held open
+while the test runs; another program (Excel) can still open it to read. When
+the test closes — the load released (`#B43`), the next START, PC mode off, or
+the window closing — the `#` summary goes **at the end**: the ramp sent and
+where the piston was, its measured rate, the peak, the warnings, and
+`closed: <why>`. A file without that last line never finished being written.
+If the file cannot be written while the test runs, that is said once and the
+whole test is written when it closes (to a new file, `_2`, if one is there).
 
 **The session recording** — every byte, both directions, to
 `<data>/captures/<start>.jsonl` (`<start>_control.jsonl` in control mode) — is

@@ -46,3 +46,32 @@ def test_never_overwrites(press, tmp_path):
     a = write_test_csv(m, m.tests[0], tmp_path)
     b = write_test_csv(m, m.tests[0], tmp_path)
     assert a != b and b.name == "test_20261019_143651_2.csv"
+
+
+def test_a_streamed_test_matches_the_whole_one_and_grows_row_by_row(press, tmp_path):
+    """The same writer streams a running test and writes a finished one."""
+    import io
+
+    from presscontroller.monitor import TestCsv
+    from presscontroller.monitor.tracker import Monitor
+    from presscontroller.tap.capture import read_capture
+    m = Monitor(press)
+    fh = io.StringIO(newline="")
+    writer = None
+    sizes = []
+    for ev in read_capture(REAL_TEST):
+        m.feed(ev)
+        test = m.current
+        if test is not None and test.t and writer is None:
+            writer = TestCsv(m, test, fh, source="replay")
+        if writer is not None and m.current is writer.test:
+            writer.update()
+            sizes.append(writer.rows)
+    writer.finish()
+    whole = write_test_csv(m, writer.test, tmp_path, source="replay")
+    assert fh.getvalue() == whole.read_text(encoding="utf-8")
+    assert sizes == sorted(sizes) and sizes[0] < sizes[-1]       # grew as it ran
+    lines = fh.getvalue().splitlines()
+    head = lines[:lines.index(next(ln for ln in lines if ln.startswith("t_s,")))]
+    assert head[0] == "# PressController test 1"
+    assert not any("peak force" in ln or "ramp sent" in ln for ln in head)

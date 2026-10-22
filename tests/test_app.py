@@ -449,52 +449,52 @@ def test_the_settings_dialog_saves_both_intervals_within_100_to_500_ms(qapp):
     assert saved[-1].test.idle_interval_ms == 250
 
 
-def test_an_open_test_is_saved_while_it_runs_and_finished_in_the_same_file(qapp, press, tmp_path):
-    """Operator, 2026-10-22: the CSV is saved during the test, not only at the end."""
+def test_an_open_test_is_streamed_to_its_file_and_finished_there(qapp, press, tmp_path):
+    """Operator, 2026-10-22: the CSV is written during the test, row by row."""
     from presscontroller.tap.capture import read_capture
     win = _window(qapp, press, until=362.0, tests_dir=tmp_path)    # mid-ramp
     try:
         files = list(tmp_path.glob("*.csv"))
         assert [f.name for f in files] == ["test_20261019_143651.csv"]
-        text = files[0].read_text(encoding="utf-8")
-        assert text.rstrip().endswith("closed: still open when saved")
-        rows_then = text.count("\n")
+        lines = files[0].read_text(encoding="utf-8").splitlines()
+        rows = [ln for ln in lines if not ln.startswith("#")]
+        test = win.monitor.current
+        assert len(rows) == 1 + len(test.t)          # every row heard is on disk
+        assert not any(ln.startswith("# closed:") for ln in lines)
         for ev in read_capture(REAL_TEST):
             if ev.t >= 362.0:
                 win.monitor.feed(ev)
         win.tick()
         assert [f.name for f in tmp_path.glob("*.csv")] == ["test_20261019_143651.csv"]
-        text = files[0].read_text(encoding="utf-8")
-        assert text.count("\n") > rows_then
-        assert "still open" not in text.splitlines()[-1]
+        lines = files[0].read_text(encoding="utf-8").splitlines()
+        assert len([ln for ln in lines if not ln.startswith("#")]) == 1 + len(test.t)
+        assert lines[-1] == "# closed: load released"
+        assert any(ln.startswith("# peak force: 1515.88") for ln in lines)
         assert win.saved == [files[0]]
     finally:
         win.close()
 
 
-def test_a_running_save_that_fails_is_said_once_and_the_test_still_saved_at_its_end(
+def test_a_stream_that_cannot_be_written_is_said_and_the_test_saved_whole_at_its_end(
         qapp, press, tmp_path, monkeypatch):
     from presscontroller.app import main_window as mw
     from presscontroller.tap.capture import read_capture
 
-    def held(*a, **k):
-        raise PermissionError("the file is open in another program")
-    monkeypatch.setattr(mw, "save_test_csv", held)
-    said = []
+    def refused(*a, **k):
+        raise PermissionError("the folder refuses new files")
+    monkeypatch.setattr(mw, "open_test_csv", refused)
     win = _window(qapp, press, until=362.0, tests_dir=tmp_path)
     try:
+        said = []
         monkeypatch.setattr(win, "say", lambda text, **k: said.append(text))
-        win._csv_saved_at = 0.0
         win.tick()
-        win._csv_saved_at = 0.0
-        win.tick()
-        # _window's own first tick said it already; these two say nothing more.
-        assert said == []
+        assert said == []                    # said once already, not again
+        assert list(tmp_path.glob("*.csv")) == []
         for ev in read_capture(REAL_TEST):
             if ev.t >= 362.0:
                 win.monitor.feed(ev)
-        win.tick()                     # closed: written whole to a new file
-        assert len(win.saved) == 1 and win.saved[0].is_file()
+        win.tick()                           # closed: written whole
+        assert [p.name for p in win.saved] == ["test_20261019_143651.csv"]
         assert said[-1].startswith("Test 1 saved")
     finally:
         win.close()

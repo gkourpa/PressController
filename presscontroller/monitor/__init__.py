@@ -6,7 +6,7 @@ record; :mod:`~presscontroller.monitor.csvfile` writes a test out. The window
 only shows what these decide.
 """
 
-from presscontroller.monitor.csvfile import new_csv_path, save_test_csv, write_test_csv
+from presscontroller.monitor.csvfile import TestCsv, open_test_csv, write_test_csv
 from presscontroller.monitor.tracker import (
     ForceDisplacement,
     LogEntry,
@@ -17,4 +17,4 @@ from presscontroller.monitor.tracker import (
 )
 
 __all__ = ["ForceDisplacement", "LogEntry", "Monitor", "Notice", "Phase", "TestRecord",
-           "new_csv_path", "save_test_csv", "write_test_csv"]
+           "TestCsv", "open_test_csv", "write_test_csv"]

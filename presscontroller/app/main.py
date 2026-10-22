@@ -28,8 +28,8 @@ with no control port it opens Settings at Connection to pick one. All three are
 remembered in the global settings, and File → Settings… changes them. A press
 file named with ``--press`` that is not there is still asked for.
 
-Every test goes to ``<data>/tests/`` as a CSV, rewritten every few seconds
-while it runs. **Only in debug mode** (the settings' ``debug_mode``, off unless
+Every test goes to ``<data>/tests/`` as a CSV, a row per measurement while it
+runs. **Only in debug mode** (the settings' ``debug_mode``, off unless
 chosen — operator, 2026-10-22) does every byte heard also go to
 ``<data>/captures/``. A replay writes nothing on its own: it is the
 recording already, and a test from it is saved only on request.

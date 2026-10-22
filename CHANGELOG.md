@@ -2,12 +2,15 @@
 
 What each version added or changed, newest first.
 
-## Unreleased
+## 0.1.2 — 2026-10-22
 
 ### Changed
 
-- **Each test's CSV is saved while the test runs**, rewritten every 5 s, not
-  only when it closes: a crash or power cut keeps all but the last seconds.
+- **Each test's CSV is written while the test runs**, a row per measurement as
+  it arrives, not only when it closes: a crash or power cut keeps every row
+  heard. The summary (ramp sent, measured rate, peak, warnings, why it closed)
+  moved from the top of the file to its end; `comment="#"` readers are
+  unaffected.
 - **The session recording (every byte, `captures/`) is kept only in debug
   mode**, a new setting in Settings → General, off by default.
 

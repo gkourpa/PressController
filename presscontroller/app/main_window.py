@@ -27,7 +27,6 @@ interval old. A message — a warning, a lost port — is said at once.
 from __future__ import annotations
 
 import os
-import time
 from dataclasses import replace
 from pathlib import Path
 
@@ -52,15 +51,12 @@ from presscontroller.app.plot import render_force_displacement
 from presscontroller.app.theme import styled, text_style
 from presscontroller.app.widgets import Coalescer, Gauge, MessageIsland, PlotView, island
 from presscontroller.config.settings import Settings, save_settings
-from presscontroller.monitor import Monitor, new_csv_path, save_test_csv, write_test_csv
+from presscontroller.monitor import Monitor, TestCsv, open_test_csv, write_test_csv
 from presscontroller.protocol import PC_TO_CTRL, rate_text
 
 #: How often the source is polled. Lines are timestamped when they arrive, not
 #: when they are polled, so this only sets how soon the window shows them.
 TICK_MS = 50
-
-#: How often an open test's CSV is rewritten while it runs, in seconds.
-CSV_SAVE_S = 5.0
 
 #: The screen's redraw ceiling, in hertz, when no settings are given — the
 #: global setting ``refresh_hz`` otherwise, as in DAqReader.
@@ -92,10 +88,10 @@ class MainWindow(QMainWindow):
         self.source = source
         self.tests_dir = tests_dir
         self.saved: list[Path] = []
-        self._csv_paths: dict[int, Path] = {}
-        """Each open test's file, chosen at its first save while it runs."""
+        self._csv: dict[int, tuple[Path, TestCsv]] = {}
+        """Each running test's file and its writer, from its first measurement."""
         self._csv_failed: set[int] = set()
-        self._csv_saved_at = 0.0
+        """Tests whose file could not be written while they ran."""
         self._logged = 0
         self._ramp_warn: bool | None = None
         self._last_error_count = 0
@@ -252,7 +248,7 @@ class MainWindow(QMainWindow):
             notices += self.monitor.feed(ev)
         for test in self.monitor.pop_closed():
             self._autosave(test)
-        self._save_running()
+        self._stream_running()
         if self.source.errors and len(self.source.errors) != self._last_error_count:
             self._last_error_count = len(self.source.errors)
             self.say(self.port_lost(self.source.errors[-1]), error=True)
@@ -423,48 +419,54 @@ class MainWindow(QMainWindow):
 
     # ---- saving ------------------------------------------------------------
 
-    def _save_running(self) -> None:
-        """The open test, rewritten to its file every :data:`CSV_SAVE_S`
-        (operator, 2026-10-22: saved during the test, not only at its end)."""
+    def _stream_running(self) -> None:
+        """The running test's new rows, added to its file as they come
+        (operator, 2026-10-22: saved during the test, streamed). The file is
+        opened with the first measurement and held open until the test closes;
+        another program can still open it to read."""
         test = self.monitor.current
-        if self.tests_dir is None or test is None or not test.t:
+        if (self.tests_dir is None or test is None or not test.t
+                or test.number in self._csv_failed):
             return
-        now = time.monotonic()
-        if now - self._csv_saved_at < CSV_SAVE_S:
-            return
-        self._csv_saved_at = now
-        path = self._csv_paths.get(test.number)
-        if path is None:
-            path = self._csv_paths[test.number] = new_csv_path(test, self.tests_dir)
         try:
-            save_test_csv(self.monitor, test, path, source=self.source.describe())
+            if test.number not in self._csv:
+                path, fh = open_test_csv(test, self.tests_dir)
+                self._csv[test.number] = (path, TestCsv(self.monitor, test, fh,
+                                                        source=self.source.describe()))
+            self._csv[test.number][1].update()
         except OSError as exc:
-            if test.number not in self._csv_failed:
-                self._csv_failed.add(test.number)
-                self.say(f"Test {test.number} could not be saved to {path} while it runs "
-                         f"({exc}). Is the file open in another program? Retrying.",
-                         warn=True)
-            return
-        self._csv_failed.discard(test.number)
+            self._csv_failed.add(test.number)
+            self._drop_stream(test.number)
+            self.say(f"Test {test.number} could not be written while it runs ({exc}); it "
+                     "will be saved whole when it closes.", warn=True)
+
+    def _drop_stream(self, number: int) -> Path | None:
+        path, writer = self._csv.pop(number, (None, None))
+        if writer is not None:
+            try:
+                writer.fh.close()
+            except OSError:
+                pass
+        return path
 
     def _autosave(self, test) -> None:
-        """Every closed test is written to the tests folder, if there is one: to
-        the file it was being saved to while it ran, else to a new one."""
+        """Every closed test is saved to the tests folder, if there is one: its
+        running file finished, or — if it had none, or writing it failed — the
+        whole test to a new file."""
         if self.tests_dir is None or not test.t:
             return
-        path = self._csv_paths.pop(test.number, None)
         self._csv_failed.discard(test.number)
-        source = self.source.describe()
+        path, writer = self._csv.get(test.number, (None, None))
         try:
-            if path is not None:
+            if writer is not None:
                 try:
-                    save_test_csv(self.monitor, test, path, source=source)
+                    writer.finish()
                 except OSError:
-                    # Held open elsewhere: the whole test goes to a new file,
-                    # and the last running save stays where it was.
-                    path = write_test_csv(self.monitor, test, self.tests_dir, source=source)
-            else:
-                path = write_test_csv(self.monitor, test, self.tests_dir, source=source)
+                    path = None
+                self._drop_stream(test.number)
+            if path is None:
+                path = write_test_csv(self.monitor, test, self.tests_dir,
+                                      source=self.source.describe())
         except OSError as exc:
             self.say(f"Test {test.number} could not be saved: {exc}", error=True)
             return
@@ -496,5 +498,7 @@ class MainWindow(QMainWindow):
         test = self.monitor.current
         if test is not None and test.t:
             self._autosave(test)
+        for number in list(self._csv):
+            self._drop_stream(number)
         self.source.close()
         super().closeEvent(ev)
