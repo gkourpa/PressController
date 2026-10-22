@@ -371,6 +371,29 @@ Proteus' path ramps under load, for comparison: 10 mm/min ran at 2.23 (step 15, 
 3 at 2.33 (step 17), 2 at 2.09 (23), 1 at 1.11 (18); step 19 ran 10 at 9.77 on a specimen that hardly
 loaded. Whether the press also has a ceiling near 2.3 mm/min under load (step 17) is open.
 
+### The press PC's first run: a force ramp to its end, 2026-10-22, `data/captures/20261022_122625_step34_force_ramp_300kN_press_pc.jsonl`
+
+The installed program on the press PC (COM4), control mode, break detection on (10 ‰), Force
+**10 kN/s to 300 kN**, measuring interval during the ramp set to **100 ms** (so CONTINUE sent
+`#D0510`, and nothing was sent after the test: the interval in force was already the one wanted —
+the after-test `#D05…` is still to be seen with a 200 ms ramp). Every line as designed:
+
+- **Approach** (`#B23` → `#B01`): 2.66 → 51.82 mm at **24.0 mm/min**, steady to the end. `#B01` at
+  **3.66 kN**; the force then **kept rising for 2.6 s** (the piston crept on 0.8 mm) to **14.5 kN**,
+  and settled at 10.8 kN by CONTINUE. Not a blow on contact: the controller does not stop the
+  piston at `#B01`, it slows it.
+- **Ramp** (`#D1210000;0;300000;0;0`): 10.42 kN/s overall, but **not even** — ~8 kN/s for the first
+  10 s (the window's warning: 7.82 kN/s at 3–10 s), **19 kN/s** for the next 4 s catching up, then
+  10.1 kN/s to the end. The first ramp of the day again (steps 15, 27).
+- **Ramp end**: `#B02` at 299.7 kN, answered `#B26 #B17`; peak 300.6 kN. The load came off at once
+  (300 → 23 kN in 2 s) and the piston sank **−16 mm/min** until `#B43` at 0.4 kN, 20 s later.
+- **`#B27` 0.33 s after that `#B17`**, the force falling 300 → 215 kN: **the unloading tripped
+  break detection** — no specimen broke. The test was over, so the program sent nothing, as
+  designed; but the test's log and CSV show "break detected" after the ramp's end.
+- **STOP with no test running** (the operator's, 13 s after `#B43`): the piston sank at **−12
+  mm/min**; the next STOP stopped it — as step 33 and the third cube. The keypad STOP at the end
+  was answered `#B17 #B36 #B21`.
+
 ### A third cube, and the piston label, 2026-10-20, `data/tests/captures/20261020_113815_control.jsonl` (73 min, 60 MB: not in git; 4 idle minutes are `tests/data/piston_still_4_min.jsonl`)
 
 Break detection on: peak **473.9 kN**; `#B27` and the automatic Cancel; the load held at ~370 kN; the
@@ -586,7 +609,8 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 - Which start-up command makes **PC** / **FO** appear on the controller display.
 - Meaning of display indicators ZB, (bottom) FO, LD.
 - What Proteus puts in the ramp's start field (0×, 1×, 2×, 0×, 0× the piston position in steps 15–19); it does not affect the speed (steps 17–19).
-- Whether the first ramp of the day is always slow (steps 15, 27), and whether a warm-up run (pump on, a few minutes, or one ramp without a specimen) prevents it.
+- Whether `#B27` after the test's own Cancel (step 34) is always the unloading tripping break detection.
+- Whether the first ramp of the day is always slow (steps 15, 27, 34; in 34 it caught up at 19 kN/s), and whether a warm-up run (pump on, a few minutes, or one ramp without a specimen) prevents it.
 - Whether a path ramp under load is limited near 2.3 mm/min (step 17: 3 set, 2.33 measured).
 - What limits a path ramp under load to about 2.3 mm/min (steps 15, 17); step 19 ran 10 mm/min without load.
 - Ramp field 4 (`0`) and whether field 5 changes with Force/Deformation control.
