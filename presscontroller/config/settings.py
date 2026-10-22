@@ -163,6 +163,12 @@ class Settings:
     """Control mode connects by itself once its window is open — no Connect to
     press (operator, 2026-10-20). Off until chosen."""
 
+    debug_mode: bool = False
+    """Keep a recording of every byte of each session (``<data>/captures``),
+    what the protocol was learnt from. Off unless chosen (operator,
+    2026-10-22): the tests' CSVs are the record; a session recording is for
+    finding out what happened on the line. Takes effect at the next start."""
+
     refresh_hz: float = DEFAULT_REFRESH_HZ
     """The window's redraw ceiling (operator, 2026-10-19: no faster than 2 Hz).
     A ceiling, not a target: every line is taken in whatever the screen shows."""
@@ -186,6 +192,7 @@ class Settings:
             f"data_dir = {toml_value(self.data_dir)}",
             f"control_port = {toml_value(self.control_port)}",
             f"auto_connect = {toml_value(self.auto_connect)}",
+            f"debug_mode = {toml_value(self.debug_mode)}",
             f"refresh_hz = {toml_value(self.refresh_hz)}",
             f"theme = {toml_value(self.theme)}",
             f"window_geometry = {toml_value(self.window_geometry)}",
@@ -317,6 +324,7 @@ def load_settings(path: str | Path | None = None) -> tuple[Settings, str | None]
                             data_dir=get_str(data, "data_dir", "", where),
                             control_port=get_str(data, "control_port", "", where).strip(),
                             auto_connect=get_bool(data, "auto_connect", False, where),
+                            debug_mode=get_bool(data, "debug_mode", False, where),
                             theme=theme,
                             window_geometry=get_str(data, "window_geometry", "", where),
                             plot=plot,

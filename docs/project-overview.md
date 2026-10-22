@@ -17,7 +17,7 @@ and undocumented, so the protocol is learnt from the live link first.
 | Stack | DAqReader's: Python 3.14, PySide6, matplotlib rendered off-screen (pyplot-free Agg), numpy, pyserial, pytest |
 | Configuration | One press file (TOML) for the installation's ports, resolution and channel ranges; global settings in `%APPDATA%\PressController` |
 | Redraw rate | At most 2 Hz for everything on screen, as DAqReader's default; to become a global setting as there. Data intake is not limited |
-| Records | Live, every byte heard goes to a capture (`<data>/captures/*.jsonl`, the sniffer's format) and every test to one CSV (`<data>/tests/`) |
+| Records | Every test to one CSV (`<data>/tests/`), saved while it runs; in debug mode also every byte heard to a capture (`<data>/captures/*.jsonl`, the sniffer's format) |
 | Python | 3.14 |
 
 ## Milestones

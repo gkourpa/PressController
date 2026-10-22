@@ -14,15 +14,24 @@ Columns: ``t_s`` (seconds since START), ``time`` (wall clock), ``counter`` (the
 controller's own 10 ms clock), ``phase``, then ``<channel>_<unit>`` and
 ``<channel>_raw`` per channel, then ``event`` — every command and event heard,
 on the first row at or after it.
+
+**Saved while the test runs** (operator, 2026-10-22): the window rewrites the
+test's file every few seconds with :func:`save_test_csv`, atomically, so a
+crash or a power cut leaves the last complete version; the last line then says
+``closed: still open when saved``. When the test closes the file is written a
+last time, whole. :func:`write_test_csv` writes a test once under a name no
+other file has (closing, and File → Save newest test as…).
 """
 
 from __future__ import annotations
 
 import csv
+import io
 import math
 from datetime import timedelta
 from pathlib import Path
 
+from presscontroller.config.toml import write_atomic
 from presscontroller.monitor.tracker import Monitor, TestRecord
 from presscontroller.protocol import rate_text
 
@@ -47,12 +56,32 @@ def csv_filename(test: TestRecord) -> str:
     return f"test_{test.started:%Y%m%d_%H%M%S}.csv"
 
 
+def new_csv_path(test: TestRecord, folder: str | Path) -> Path:
+    """Where ``test`` goes in ``folder``: a name no file has yet."""
+    return _unique(Path(folder) / csv_filename(test))
+
+
 def write_test_csv(monitor: Monitor, test: TestRecord, folder: str | Path, *,
                    source: str = "") -> Path:
     """Write ``test`` into ``folder`` under a name no other file has; return it."""
-    press = monitor.press
-    path = _unique(Path(folder) / csv_filename(test))
+    path = new_csv_path(test, folder)
     path.parent.mkdir(parents=True, exist_ok=True)
+    text = test_csv_text(monitor, test, source=source)
+    with open(path, "x", encoding="utf-8", newline="") as fh:
+        fh.write(text)
+    return path
+
+
+def save_test_csv(monitor: Monitor, test: TestRecord, path: str | Path, *,
+                  source: str = "") -> Path:
+    """Write ``test`` to ``path``, replacing what an earlier save of the same
+    test left there -- atomically, so the file is always one whole version."""
+    return write_atomic(path, test_csv_text(monitor, test, source=source))
+
+
+def test_csv_text(monitor: Monitor, test: TestRecord, *, source: str = "") -> str:
+    """The whole CSV of ``test`` as it stands."""
+    press = monitor.press
     indices = sorted(test.raw)
     names = []
     for idx in indices:
@@ -109,7 +138,7 @@ def write_test_csv(monitor: Monitor, test: TestRecord, folder: str | Path, *,
             tail.append(f"{t:.3f} s {text}")
 
     values = {idx: monitor.series(test, idx) for idx in indices}
-    with open(path, "x", encoding="utf-8", newline="") as fh:
+    with io.StringIO(newline="") as fh:
         for line in header:
             fh.write("# " + " ".join(str(line).splitlines()) + "\n")
         w = csv.writer(fh, lineterminator="\n")
@@ -127,4 +156,4 @@ def write_test_csv(monitor: Monitor, test: TestRecord, folder: str | Path, *,
             w.writerow(row + [" | ".join(row_events.get(i, []))])
         for line in tail + [f"closed: {test.close_reason or 'still open when saved'}"]:
             fh.write("# " + line + "\n")
-    return path
+        return fh.getvalue()

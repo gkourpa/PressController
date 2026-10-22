@@ -75,6 +75,7 @@ interval), edited in File → Settings… and, for the ramp, in the window.
 
 ## Recording
 
-A control session is captured like the tap's, both directions, to
-`<data>/captures/<start>_control.jsonl`, and replays in the monitor
-(`--replay`). Tests the monitor sees are saved to `<data>/tests/` as usual.
+In debug mode (Settings → General) a control session is captured like the
+tap's, both directions, to `<data>/captures/<start>_control.jsonl`, and replays
+in the monitor (`--replay`). Tests are saved to `<data>/tests/` as usual, while
+they run (docs/ui.md, Saving).

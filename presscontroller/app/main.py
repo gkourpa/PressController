@@ -14,7 +14,8 @@ press file's ``[limits]`` (:mod:`presscontroller.control`, docs/motion.md). It
 connects by itself when the settings' ``auto_connect`` is on. (A confirmation
 dialog on every launch was dropped once control mode had run on the press —
 operator, 2026-10-20; Connect still listens first and refuses a busy line.) Its
-captures and tests go where the monitor's do, named ``*_control.jsonl``.
+tests go where the monitor's do, and in debug mode its session recording,
+named ``*_control.jsonl``.
 
 The window opens where, and as, it was last closed (size, position, maximized
 or full screen), in the settings' theme.
@@ -27,8 +28,10 @@ with no control port it opens Settings at Connection to pick one. All three are
 remembered in the global settings, and File → Settings… changes them. A press
 file named with ``--press`` that is not there is still asked for.
 
-Live, every byte heard goes to ``<data>/captures/`` and every test the monitor
-closes to ``<data>/tests/``. A replay writes nothing on its own: it is the
+Every test goes to ``<data>/tests/`` as a CSV, rewritten every few seconds
+while it runs. **Only in debug mode** (the settings' ``debug_mode``, off unless
+chosen — operator, 2026-10-22) does every byte heard also go to
+``<data>/captures/``. A replay writes nothing on its own: it is the
 recording already, and a test from it is saved only on request.
 """
 
@@ -164,9 +167,10 @@ def main(argv: list[str] | None = None) -> int:
         settings = replace(settings, data_dir=data_dir)
         tests_dir = Path(data_dir) / "tests"
         start = datetime.now()
-        capture = CaptureWriter(Path(data_dir) / "captures" / f"{start:%Y%m%d_%H%M%S}.jsonl",
-                                ports={"PC>CTRL": press.pc_port, "CTRL>PC": press.ctrl_port},
-                                settings=LINE_SETTINGS, start=start)
+        capture = (CaptureWriter(Path(data_dir) / "captures" / f"{start:%Y%m%d_%H%M%S}.jsonl",
+                                 ports={"PC>CTRL": press.pc_port, "CTRL>PC": press.ctrl_port},
+                                 settings=LINE_SETTINGS, start=start)
+                   if settings.debug_mode else None)
         source = SerialTap(press.pc_port, press.ctrl_port, capture=capture)
     save_settings(settings)
 
@@ -202,9 +206,10 @@ def _run_control(app, settings, press: PressConfig) -> int:
     settings = replace(settings, data_dir=data_dir)
     save_settings(settings)
     start = datetime.now()
-    capture = CaptureWriter(
+    capture = (CaptureWriter(
         Path(data_dir) / "captures" / f"{start:%Y%m%d_%H%M%S}_control.jsonl",
         ports={"control": port}, settings=LINE_SETTINGS, start=start)
+               if settings.debug_mode else None)
     session = ControllerSession(ControllerLink(port, limits=Limits.from_press(press),
                                                capture=capture))
     win = ControlWindow(Monitor(press), session, tests_dir=Path(data_dir) / "tests",

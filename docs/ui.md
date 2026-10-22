@@ -84,10 +84,20 @@ nothing and would have taught them to ignore the one warning that matters.
 
 ## Saving
 
-Live, every byte heard is written to `<data>/captures/<start>.jsonl` as it
-arrives, and every test the monitor closes is written to
-`<data>/tests/test_<START time>.csv` without being asked. A test still open when
-the window closes is saved too. A replay writes nothing on its own;
+Every test is saved to `<data>/tests/test_<START time>.csv` without being
+asked, **while it runs** (operator, 2026-10-22): from START the file is rewritten
+every 5 s, atomically, so a crash or a power cut leaves the last whole version
+(its last line then reads `closed: still open when saved`). When the test
+closes — the load released (`#B43`), the next START, PC mode off, or the window
+closing — the same file is written a last time. If it is held open in another
+program (Excel), a running save is retried and said once, and the closing save
+goes to a new file (`_2`).
+
+**The session recording** — every byte, both directions, to
+`<data>/captures/<start>.jsonl` (`<start>_control.jsonl` in control mode) — is
+kept **only in debug mode** (Settings → General; off unless chosen, from the
+next start). It is what the protocol was learnt from, and what to switch on for
+a session whose line is to be checked. A replay writes nothing on its own;
 **File → Save newest test as CSV…** saves on request.
 
 ## The control window

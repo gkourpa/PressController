@@ -177,11 +177,15 @@ class SettingsDialog(QDialog):
         press_row = QHBoxLayout()
         press_row.addWidget(self.press_file, 1)
         press_row.addWidget(press_btn)
+        self.debug_mode = QCheckBox("Debug mode: record every byte of each session "
+                                    "(captures folder)")
+        self.debug_mode.setChecked(settings.debug_mode)
         general = QFormLayout()
         general.addRow("Theme", self.theme)
         general.addRow("Screen redraws at most", self.refresh)
         general.addRow("Data folder", data_row)
         general.addRow("Press file", press_row)
+        general.addRow(self.debug_mode)
 
         # ---- Connection ------------------------------------------------------
         self.port = QComboBox()
@@ -253,7 +257,8 @@ class SettingsDialog(QDialog):
         self.tabs.addTab(_page(general, "The theme takes effect at once. The redraw rate is "
                                         "a ceiling, not a target: every reading is taken in "
                                         "whatever the screen shows. A new data folder is "
-                                        "used from the next start. The press file holds the "
+                                        "used from the next start, as is debug mode. The "
+                                        "tests are always saved. The press file holds the "
                                         "press's channels and limits; edit it in a text "
                                         "editor and restart."), TABS[0])
         self.tabs.addTab(_page(connection, "Any port name may be typed. Connecting first "
@@ -341,6 +346,7 @@ class SettingsDialog(QDialog):
         self.settings = replace(
             self.settings, refresh_hz=float(self.refresh.value()),
             theme=self.theme.currentData(), data_dir=self._data_dir,
+            debug_mode=self.debug_mode.isChecked(),
             control_port=self.port.currentText().strip(),
             auto_connect=self.auto_connect.isChecked(), test=test,
             plot=PlotSettings(xlim=self.x_range.value(), ylim=self.y_range.value(),

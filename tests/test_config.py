@@ -71,7 +71,7 @@ def test_unreadable_file_is_a_config_error(tmp_path):
 
 def test_settings_round_trip_into_the_sandbox(_sandboxed_settings):
     assert settings_path() == _sandboxed_settings
-    s = Settings(press_file="C:\\x\\press.toml", data_dir="C:\\data")
+    s = Settings(press_file="C:\\x\\press.toml", data_dir="C:\\data", debug_mode=True)
     save_settings(s)
     assert load_settings() == (s, None)
 
