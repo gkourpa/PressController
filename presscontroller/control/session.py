@@ -345,11 +345,11 @@ class ControllerSession:
                           "STOP (or Esc) stops the pump.")
             return
         if isinstance(msg, Command) and msg.code == 27:
-            # Step 32: after a break the controller held the load; one Cancel
-            # stopped the pump but did not release it; the keypad STOP did,
-            # once PC mode was off. Whether a second Cancel releases it is the
-            # next cube's question (operator, 2026-10-20), so the session stays
-            # connected and STOP stays available.
+            # After a break the controller holds the load (step 32). This first
+            # Cancel stops the pump; the operator's STOP, a second Cancel,
+            # releases the load and the piston sinks; a third stops the sinking
+            # (step 33). Kept manual (operator, 2026-10-20), so the session
+            # stays connected and STOP stays available.
             self.link.send(cmd.CANCEL)
             self._end_test()
             self._say("The controller reported a break (#B27): pump off. The load may still be "
@@ -427,8 +427,8 @@ class ControllerSession:
                     self._apply_switches()
                     self._say("Connected: the controller is in PC mode and streaming; Peak "
                               f"{'on' if self.peak else 'off'}, break detection "
-                              f"{'on' if self.break_detection else 'off'}. No motion command "
-                              "can be sent in this version.")
+                              f"{'on' if self.break_detection else 'off'}. START begins a "
+                              "test; STOP (or Esc) stops the pump.")
                 else:
                     self._abort("the controller streamed before it was asked to")
                 return

@@ -99,9 +99,10 @@ Anything else is refused before a byte is written.
   (confirmed at a cube's failure, step 32) — and then **holds the load**: Cancel
   stops the pump but does not release it. The keypad STOP releases it once PC
   mode is off. On `#B27` the session sends `#B17` and **stays connected**; the
-  message, in red, says to press STOP (a second Cancel — whether it releases the
-  load is the next cube's question, operator 2026-10-20) and, if the load does
-  not come off, Disconnect and the keypad STOP.
+  message, in red, says to press STOP: that second Cancel releases the load and
+  the piston sinks, and a third stops the sinking (step 33; kept manual,
+  operator 2026-10-20). If the load does not come off, Disconnect and the
+  keypad STOP.
   Any other controller line no recording explains is answered with STOP.
 
 ## When something goes wrong — every case ends in `#B17`
