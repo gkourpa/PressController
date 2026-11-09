@@ -85,13 +85,22 @@ def test_broken_settings_load_as_defaults_with_the_reason(_sandboxed_settings):
 
 
 def test_the_test_settings_round_trip(_sandboxed_settings):
-    from presscontroller.config.settings import TemplateSettings
+    from presscontroller.config.settings import ProgramStep, TemplateSettings
     s = Settings(control_port="COM7", refresh_hz=1.5,
-                 test=TemplateSettings(peak=True, break_detection=False,
+                 test=TemplateSettings(peak=True,
                                        break_threshold_per_mil=25.0, start_load_percent=0.2,
-                                       ramp_control="force", force_speed_kn_s=5.0,
-                                       force_end_kn=300.0, measuring_interval_ms=100,
-                                       idle_interval_ms=300))
+                                       measuring_interval_ms=100,
+                                       idle_interval_ms=300,
+                                       steps=(ProgramStep("ramp", 200.0, 2.0),
+                                              ProgramStep("ramp", control="path",
+                                                          path_mm=-1.5, path_relative=True,
+                                                          speed_mm_min=3.0),
+                                              ProgramStep("ramp", control="path",
+                                                          path_mm=80.0, speed_mm_min=1.0),
+                                              ProgramStep("hold", hold_s=12.5),
+                                              ProgramStep("ramp", 100.0, 1.5),
+                                              ProgramStep("ramp", 300.0, 5.0,
+                                                          break_on=True))))
     save_settings(s)
     assert load_settings() == (s, None)
 
@@ -99,19 +108,19 @@ def test_the_test_settings_round_trip(_sandboxed_settings):
 def test_an_unusable_test_value_falls_back_to_its_own_default_and_is_named(_sandboxed_settings):
     from presscontroller.config.settings import TemplateSettings
     _sandboxed_settings.parent.mkdir(parents=True)
-    _sandboxed_settings.write_text('control_port = "COM7"\n[test]\nbreak_detection = 1\n'
-                                   'start_load_percent = 5.0\npath_speed_mm_min = 3.0\n'
+    _sandboxed_settings.write_text('control_port = "COM7"\n[test]\npeak = 1\n'
+                                   'start_load_percent = 5.0\nbreak_threshold_per_mil = 3.0\n'
                                    'measuring_interval_ms = 205\nidle_interval_ms = 50\n'
                                    'colour = "red"\n',
                                    encoding="utf-8")
     settings, problem = load_settings()
     t = settings.test
-    assert settings.control_port == "COM7" and t.path_speed_mm_min == 3.0   # the rest counts
+    assert settings.control_port == "COM7" and t.break_threshold_per_mil == 3.0   # the rest
     d = TemplateSettings()
-    assert (t.break_detection, t.start_load_percent, t.measuring_interval_ms,
-            t.idle_interval_ms) == (d.break_detection, d.start_load_percent,
+    assert (t.peak, t.start_load_percent, t.measuring_interval_ms,
+            t.idle_interval_ms) == (d.peak, d.start_load_percent,
                                     d.measuring_interval_ms, d.idle_interval_ms)
-    for words in ("break_detection must be true or false", "start load 5 %",
+    for words in ("peak must be true or false", "start load 5 %",
                   "measuring interval 205 ms", "measuring interval before the ramp 50 ms",
                   "unknown key test.colour"):
         assert words in problem
@@ -124,7 +133,8 @@ def test_a_settings_file_from_before_the_test_settings_still_loads(_sandboxed_se
                                    encoding="utf-8")
     settings, problem = load_settings()
     assert problem is None and settings.test == TemplateSettings()
-    assert settings.test.break_detection is True                  # operator, 2026-10-19
+    assert settings.test.steps[0].control == "path"               # the lab's template
+    assert settings.test.steps[0].break_on is True                # operator, 2026-10-19
 
 
 def test_the_default_press_is_the_labs_and_loads_without_problems(tmp_path):
@@ -160,3 +170,19 @@ def test_the_first_run_files_sit_beside_the_settings_and_in_documents(_sandboxed
     monkeypatch.setattr(Path, "home", lambda: tmp_path / "home")
     assert default_press_path() == _sandboxed_settings.parent / "press.toml"
     assert default_data_dir() == tmp_path / "home" / "Documents" / "PressController"
+
+
+def test_a_program_that_cannot_be_read_falls_back_to_the_default_and_is_named(
+        _sandboxed_settings):
+    from presscontroller.config.settings import DEFAULT_STEPS
+    _sandboxed_settings.parent.mkdir(parents=True)
+    _sandboxed_settings.write_text('[test]\npeak = true\n'
+                                   '[[test.steps]]\nkind = "ramp"\nend_kn = "high"\n',
+                                   encoding="utf-8")
+    settings, problem = load_settings()
+    assert settings.test.peak and settings.test.steps == DEFAULT_STEPS
+    assert "test.steps[1]: end_kn must be a number" in problem
+    _sandboxed_settings.write_text('[test]\n[[test.steps]]\nkind = "hold"\nhold_s = 5.0\n',
+                                   encoding="utf-8")
+    settings, problem = load_settings()
+    assert settings.test.steps == DEFAULT_STEPS and "must start with a ramp" in problem

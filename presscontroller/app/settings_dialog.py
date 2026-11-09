@@ -8,9 +8,11 @@ in). The theme takes effect at once on OK, as DAqReader's does.
   and the files: the data folder (chosen here; used from the next start) and
   the press file in use (shown, with its folder a click away, to be edited).
 * **Connection** — control mode's port, and whether it connects by itself.
-* **Test** — Proteus' test template (docs/motion.md): Peak, break detection and
-  its threshold, the start load, the ramps and the measuring interval; what the
-  control window's switches and ramp start from, and what START sends.
+* **Test** — what Proteus' test template held besides the program
+  (docs/motion.md): Peak, the break threshold, the start load and the
+  measuring interval before the program. The program itself — ramps, holds,
+  break detection, its measuring interval — is the control window's **Edit
+  program…** (:mod:`~presscontroller.app.program_dialog`).
 * **Plot** — the force–displacement plot's axes (fitted, or a fixed range) and
   its colour, as DAqReader's plot dialog has them.
 
@@ -61,13 +63,10 @@ from presscontroller.config.settings import (
     MIN_INTERVAL_MS,
     MIN_REFRESH_HZ,
     MIN_START_LOAD,
-    RAMP_CONTROL_LABELS,
-    RAMP_CONTROLS,
     THEME_LABELS,
     THEMES,
     PlotSettings,
     Settings,
-    TemplateSettings,
     save_settings,
 )
 
@@ -201,28 +200,13 @@ class SettingsDialog(QDialog):
         connection.addRow("Control mode's port", self.port)
         connection.addRow(self.auto_connect)
 
-        # ---- Test: Proteus' template ----------------------------------------
+        # ---- Test: Proteus' template, less the program ------------------------
         self.peak = QCheckBox("Peak")
         self.peak.setChecked(t.peak)
-        self.break_detection = QCheckBox("Break detection")
-        self.break_detection.setChecked(t.break_detection)
         self.threshold = _spin(MIN_BREAK_THRESHOLD, MAX_BREAK_THRESHOLD,
                                t.break_threshold_per_mil, 1, 1.0, " ‰")
         self.start_load = _spin(MIN_START_LOAD, MAX_START_LOAD, t.start_load_percent, 2, 0.01,
                                 " % of the force range")
-        self.control = QComboBox()
-        for name in RAMP_CONTROLS:
-            self.control.addItem(RAMP_CONTROL_LABELS[name], name)
-        self.control.setCurrentIndex(max(0, self.control.findData(t.ramp_control)))
-        self.path_speed = _spin(0.01, 1000.0, t.path_speed_mm_min, 3, 0.5, " mm/min")
-        self.path_end = _spin(0.001, 10000.0, t.path_end_mm, 3, 1.0, " mm")
-        self.force_speed = _spin(0.001, 1000.0, t.force_speed_kn_s, 3, 0.5, " kN/s")
-        self.force_end = _spin(0.1, 100000.0, t.force_end_kn, 1, 10.0, " kN")
-        self.interval = QSpinBox()
-        self.interval.setRange(MIN_INTERVAL_MS, MAX_INTERVAL_MS)
-        self.interval.setSingleStep(10)
-        self.interval.setSuffix(" ms")
-        self.interval.setValue(t.measuring_interval_ms)
         self.idle_interval = QSpinBox()
         self.idle_interval.setRange(MIN_INTERVAL_MS, MAX_INTERVAL_MS)
         self.idle_interval.setSingleStep(10)
@@ -230,16 +214,9 @@ class SettingsDialog(QDialog):
         self.idle_interval.setValue(t.idle_interval_ms)
         test = QFormLayout()
         test.addRow(self.peak)
-        test.addRow(self.break_detection)
         test.addRow("Break threshold", self.threshold)
         test.addRow("Start load", self.start_load)
-        test.addRow("Ramp control", self.control)
-        test.addRow("Path ramp: speed", self.path_speed)
-        test.addRow("Path ramp: end", self.path_end)
-        test.addRow("Force ramp: speed", self.force_speed)
-        test.addRow("Force ramp: end", self.force_end)
-        test.addRow("Measuring interval before the ramp", self.idle_interval)
-        test.addRow("Measuring interval during the ramp", self.interval)
+        test.addRow("Measuring interval before the program", self.idle_interval)
 
         # ---- Plot ----------------------------------------------------------------
         self.x_range = AxisRange(settings.plot.xlim)
@@ -265,12 +242,12 @@ class SettingsDialog(QDialog):
                                            "listens for 1.5 s and refuses if something "
                                            "else — the old PC — is talking to the "
                                            "controller."), TABS[1])
-        self.tabs.addTab(_page(test, "Peak and Break detection are also the control "
-                                     "window's switches; a flip there is remembered here. "
-                                     "START refuses a ramp faster than the press file's "
-                                     "[limits] and says so. The measuring intervals are "
-                                     "rounded to 10 ms; 100 ms is the fastest the "
-                                     "controller has been seen to send."), TABS[2])
+        self.tabs.addTab(_page(test, "Peak is also the control window's switch; a flip "
+                                     "there is remembered here. The program — its ramps, "
+                                     "holds, break detection and measuring interval — is "
+                                     "edited with Program → Edit in the control window. The "
+                                     "measuring interval is rounded to 10 ms; 100 ms is the "
+                                     "fastest the controller has been seen to send."), TABS[2])
         self.tabs.addTab(_page(plot, "Auto fits the axis to the test's data; a fixed range "
                                      "keeps it still while the test runs."), TABS[3])
 
@@ -331,17 +308,11 @@ class SettingsDialog(QDialog):
         def tens(ms: int) -> int:
             return min(MAX_INTERVAL_MS, max(MIN_INTERVAL_MS, int(round(ms / 10.0)) * 10))
 
-        test = TemplateSettings(
+        test = replace(
+            self.settings.test,
             peak=self.peak.isChecked(),
-            break_detection=self.break_detection.isChecked(),
             break_threshold_per_mil=round(self.threshold.value(), 1),
             start_load_percent=round(self.start_load.value(), 2),
-            ramp_control=self.control.currentData(),
-            path_speed_mm_min=self.path_speed.value(),
-            path_end_mm=self.path_end.value(),
-            force_speed_kn_s=self.force_speed.value(),
-            force_end_kn=self.force_end.value(),
-            measuring_interval_ms=tens(self.interval.value()),
             idle_interval_ms=tens(self.idle_interval.value()))
         self.settings = replace(
             self.settings, refresh_hz=float(self.refresh.value()),

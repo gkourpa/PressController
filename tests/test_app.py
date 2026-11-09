@@ -196,32 +196,40 @@ def test_the_control_window_connects_switches_and_disconnects_on_close(qapp, pre
         assert win.windowTitle() == f"PressController — {press.name}"
         assert win.connect_btn.isEnabled() and not win.disconnect_btn.isEnabled()
         assert not win.start_btn.isEnabled() and not win.stop_btn.isEnabled()
-        assert win.break_switch.isChecked() and not win.peak_switch.isChecked()
-        assert win.break_switch.state_text() == "Break detection: ON"
+        assert not win.peak_switch.isChecked()
+        # The default program: one path ramp, break detection on for it.
+        assert win.break_lbl.text() == "Break detection: ON"
+        assert win.program_lbl.text() == "Path 2 mm/min to 100 mm\nbreak detection on"
         win.connect_btn.click()
         _tick_until(win, lambda: session.state is SessionState.CONNECTED)
         assert win.state_lbl.text() == "Controller: connected, in PC mode"
         assert win.disconnect_btn.isEnabled() and not win.connect_btn.isEnabled()
         assert win.start_btn.isEnabled() and win.stop_btn.isEnabled()
         assert "Connected" in win.message.text()
+        assert not fake.break_detection           # off until a program's START
         win.peak_switch.click()
-        win.break_switch.click()
-        assert fake.peak and not fake.break_detection
-        assert win.break_switch.state_text() == "Break detection: OFF"
+        assert fake.peak
         # A flip is remembered, never reset.
-        assert saved[-1].test.peak and not saved[-1].test.break_detection
+        assert saved[-1].test.peak
     finally:
         win.close()
     assert fake.written[-2:] == ["#B36", "#B21"] and not fake.pc_mode
 
 
-def test_the_switches_open_at_the_saved_settings(qapp, press, monkeypatch):
-    from presscontroller.config.settings import Settings, TemplateSettings
+def test_peak_and_the_program_open_at_the_saved_settings(qapp, press, monkeypatch):
+    from presscontroller.config.settings import ProgramStep, Settings, TemplateSettings
     from presscontroller.control import SessionState
-    settings = Settings(test=TemplateSettings(peak=True, break_detection=False))
+    settings = Settings(test=TemplateSettings(
+        peak=True,
+        steps=(ProgramStep("ramp", 200.0, 2.0), ProgramStep("hold", hold_s=10.0),
+               ProgramStep("ramp", 100.0, 2.0), ProgramStep("hold", hold_s=10.0),
+               ProgramStep("ramp", 250.0, 4.0, break_on=True))))
     win, fake, _ = _control_window(qapp, press, monkeypatch, settings)
     try:
-        assert win.peak_switch.isChecked() and not win.break_switch.isChecked()
+        assert win.peak_switch.isChecked()
+        assert win.break_lbl.text() == "Break detection: from step 5"
+        assert win.program_lbl.text().startswith("5 steps (3 ramps, 2 holds)")
+        assert not hasattr(win, "limit_lbl")          # not shown (operator, 2026-11-09)
         win.connect_btn.click()
         _tick_until(win, lambda: win.session.state is SessionState.CONNECTED)
         assert fake.peak and not fake.break_detection
@@ -236,15 +244,14 @@ def test_a_test_run_from_the_buttons(qapp, press, monkeypatch):
     try:
         win.connect_btn.click()
         _tick_until(win, lambda: s.state is SessionState.CONNECTED)
-        assert win.limit_lbl.text() == "limit 10 mm/min"
         win.start_btn.click()
         _tick_until(win, lambda: s.test is RunPhase.AT_START_LOAD)
         assert not win.start_btn.isEnabled() and win.continue_btn.isEnabled()
-        assert not win.peak_switch.isEnabled() and not win.speed_box.isEnabled()
+        assert not win.peak_switch.isEnabled() and not win.edit_btn.isEnabled()
         win.continue_btn.click()
         _tick_until(win, lambda: s.test is RunPhase.RAMP)
         assert fake.ramp == "#D1233;0;100000;0;1"
-        assert win.run_lbl.text() == "Test: ramp running"
+        assert win.run_lbl.text() == "Path to 100 mm at 2 mm/min"
         win._display.flush()
         assert win.test_lbl.text().startswith("#1, START at")      # the monitor's own line
         assert win.pause_btn.isEnabled() and not win.continue_btn.isEnabled()
@@ -264,20 +271,74 @@ def test_a_test_run_from_the_buttons(qapp, press, monkeypatch):
 
 
 def test_a_ramp_over_the_limit_turns_start_off_and_says_why(qapp, press, monkeypatch):
+    from dataclasses import replace
+
+    from presscontroller.config.settings import ProgramStep, Settings, TemplateSettings
     from presscontroller.control import SessionState
-    win, fake, saved = _control_window(qapp, press, monkeypatch)
+    path_120 = ProgramStep("ramp", control="path", path_mm=100.0, speed_mm_min=120.0)
+    win, fake, saved = _control_window(
+        qapp, press, monkeypatch,
+        Settings(test=TemplateSettings(steps=(path_120,))))         # step 22's mistake
     try:
         win.connect_btn.click()
         _tick_until(win, lambda: win.session.state is SessionState.CONNECTED)
-        win.speed_box.setValue(120.0)           # step 22's mistake
         assert not win.start_btn.isEnabled()
         assert "START is off" in win.run_lbl.text() and "limits" in win.run_lbl.text()
-        assert saved[-1].test.path_speed_mm_min == 120.0      # remembered as entered
-        win.control_box.setCurrentIndex(win.control_box.findData("force"))
-        assert win.speed_box.suffix() == " kN/s" and win.limit_lbl.text() == "limit 15 kN/s"
-        assert win.start_btn.isEnabled()
+        win.apply_settings(replace(win.settings, test=replace(
+            win.settings.test, steps=(ProgramStep("ramp", 100.0, 2.0),))))
+        assert win.start_btn.isEnabled() and "START is off" not in win.run_lbl.text()
     finally:
         win.close()
+
+
+def _program_dialog(press, test):
+    from presscontroller.app.program_dialog import ProgramDialog
+    from presscontroller.control import Limits, plan_program
+    limits = Limits.from_press(press)
+    return ProgramDialog(test, lambda t: plan_program(t, limits, peak=False))
+
+
+def test_the_program_dialog_builds_step_38s_cycle(qapp, press):
+    from presscontroller.config.settings import ProgramStep, TemplateSettings
+    dlg = _program_dialog(press, TemplateSettings())
+    ok = dlg.buttons.button(dlg.buttons.StandardButton.Ok)
+    # The default program is one Path ramp; make it step 38's.
+    assert dlg._steps[0].control == "path"
+    dlg._edit(0, control="force", end_kn=200.0, break_on=False)
+    assert not hasattr(dlg, "add_cycle")       # removed (operator, 2026-11-09)
+    for click in ("add_hold", "add_ramp", "add_hold", "add_ramp"):
+        getattr(dlg, click).click()
+    assert [s.kind for s in dlg.current().steps] == ["ramp", "hold", "ramp", "hold", "ramp"]
+    assert dlg._rows[1]["time"].text() == "10 s"
+    dlg._edit(2, end_kn=100.0)
+    dlg._edit(4, end_kn=250.0, speed_kn_s=4.0)
+    dlg._edit(4, break_on=True)
+    t = dlg.current()
+    assert t.steps == (ProgramStep("ramp", 200.0, 2.0), ProgramStep("hold", hold_s=10.0),
+                       ProgramStep("ramp", 100.0, 2.0), ProgramStep("hold", hold_s=10.0),
+                       ProgramStep("ramp", 250.0, 4.0, break_on=True))
+    assert ok.isEnabled() and dlg.errors.text() == ""
+    assert dlg.program.steps[4].lines[:2] == ("#B33", "#D21100")
+    dlg._accept()
+    assert dlg.test == t
+
+
+def test_the_program_dialog_says_what_is_wrong_and_keeps_ok_off(qapp, press):
+    from presscontroller.config.settings import ProgramStep, TemplateSettings
+    dlg = _program_dialog(press, TemplateSettings(
+        steps=(ProgramStep("ramp", 200.0, 2.0, break_on=True),)))
+    ok = dlg.buttons.button(dlg.buttons.StandardButton.Ok)
+    assert ok.isEnabled()
+    dlg.add_ramp.click()                       # down to 100 kN under break detection
+    assert not ok.isEnabled()
+    assert "would read as a break" in dlg._rows[1]["problem"].text()
+    assert dlg.errors.text() == "Fix the steps marked in red."
+    dlg._move(1, -1)                           # now the 100 kN ramp goes first
+    assert ok.isEnabled()
+    assert not dlg._steps[0].break_on and dlg._steps[1].break_on
+    dlg._remove(0)
+    dlg._remove(0)                             # the last step is never removed
+    assert len(dlg._steps) == 1
 
 
 def test_the_settings_dialog_saves_only_on_ok(qapp):
@@ -287,18 +348,19 @@ def test_the_settings_dialog_saves_only_on_ok(qapp):
     dlg = SettingsDialog(Settings(control_port="COM7"), save=saved.append)
     assert dlg.port.currentText() == "COM7"
     dlg.threshold.setValue(25.0)
-    dlg.interval.setValue(205)
+    dlg.idle_interval.setValue(205)
     dlg.refresh.setValue(1.0)
     dlg.reject()
     assert saved == [] and dlg.settings.test.break_threshold_per_mil == 10.0
     dlg = SettingsDialog(Settings(control_port="COM7"), save=saved.append)
     dlg.threshold.setValue(25.0)
-    dlg.interval.setValue(205)
+    dlg.idle_interval.setValue(205)
     dlg.port.setCurrentText("COM6")
     dlg._accept()
     got = saved[-1]
     assert got.test.break_threshold_per_mil == 25.0 and got.control_port == "COM6"
-    assert got.test.measuring_interval_ms in (200, 210)   # whole 10 ms steps
+    assert got.test.idle_interval_ms in (200, 210)        # whole 10 ms steps
+    assert got.test.steps == Settings().test.steps         # the program is not this dialog's
     assert got.test.problems() == []
 
 
@@ -434,19 +496,24 @@ def test_the_left_column_fills_the_height(qapp, press):
         win.close()
 
 
-def test_the_settings_dialog_saves_both_intervals_within_100_to_500_ms(qapp):
+def test_both_intervals_are_kept_within_100_to_500_ms(qapp, press):
     from presscontroller.app.settings_dialog import SettingsDialog
     from presscontroller.config.settings import Settings
     saved = []
     dlg = SettingsDialog(Settings(), save=saved.append).show_tab("Test")
-    assert (dlg.idle_interval.value(), dlg.interval.value()) == (100, 200)
+    assert dlg.idle_interval.value() == 100
     assert (dlg.idle_interval.minimum(), dlg.idle_interval.maximum()) == (100, 500)
-    assert (dlg.interval.minimum(), dlg.interval.maximum()) == (100, 500)
     dlg.idle_interval.setValue(50)                # clamped to the fastest ever seen
     assert dlg.idle_interval.value() == 100
     dlg.idle_interval.setValue(254)
     dlg._accept()
     assert saved[-1].test.idle_interval_ms == 250
+    # The program's interval is the program dialog's.
+    prog = _program_dialog(press, Settings().test)
+    assert prog.interval.value() == 200
+    assert (prog.interval.minimum(), prog.interval.maximum()) == (100, 500)
+    prog.interval.setValue(254)
+    assert prog.current().measuring_interval_ms == 250
 
 
 def test_an_open_test_is_streamed_to_its_file_and_finished_there(qapp, press, tmp_path):

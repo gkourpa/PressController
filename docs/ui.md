@@ -36,8 +36,9 @@ becomes a global setting as DAqReader's `refresh_hz` is.
 ## Layout
 
 - **Status card**: whether Proteus has the controller in PC mode, the data
-  interval, the test's phase, the test (number, START time, running or why it
-  ended), the ramp that was sent, and the live path and force rates.
+  interval, the test's phase (a hold too: `#B26` alone), the test (number,
+  START time, running or why it ended), the newest ramp that was sent, and the
+  live path and force rates.
 - **Gauges**: one per channel of the press file, and the peak force of the
   newest test. Copied from DAqReader, with its rules: right-aligned, sized for the
   widest reading the channel's range can give, shrinking only, never a zero for
@@ -85,13 +86,13 @@ nothing and would have taught them to ignore the one warning that matters.
 ## Saving
 
 Every test is saved to `<data>/tests/test_<START time>.csv` without being
-asked, **streamed while it runs** (operator, 2026-10-22): the file opens with the
+asked (with a `step` column: each ramp and hold of a program counted as heard), **streamed while it runs** (operator, 2026-10-22): the file opens with the
 test's first measurement, its `#` head (the press, START, the resolution and
 each channel's range) first, and **every measurement adds a row at once**, so
 a crash or a power cut loses nothing already heard. The file is held open
 while the test runs; another program (Excel) can still open it to read. When
 the test closes — the load released (`#B43`), the next START, PC mode off, or
-the window closing — the `#` summary goes **at the end**: the ramp sent and
+the window closing — the `#` summary goes **at the end**: each ramp sent and
 where the piston was, its measured rate, the peak, the warnings, and
 `closed: <why>`. A file without that last line never finished being written.
 If the file cannot be written while the test runs, that is said once and the
@@ -113,29 +114,68 @@ two bars on top. The connection bar:
 
 - **Controller: …** — the session's state (not connected, checking the line is
   free, connecting, connected in PC mode, refused or aborted).
-- **Break detection** and **Peak** — on/off **switches** with the state in words
-  (operator, 2026-10-19: "a switch, easy for everyone to understand"). The
-  controller does not report either, so the program *sets* them to the switches'
-  positions as it connects, at START and on every flip; a switch never shows a
-  guess. **They are obeyed, never reset** (operator, 2026-10-20): they open at
-  the saved settings (break detection on, Peak off by default) and a flip is
-  saved. A switch flipped while not connected is applied on connecting; during a
-  test they are locked.
+- **Break detection: …** — what the program sets, in words, with a note under
+  it: OFF, ON (for the whole test), or "from step 5 — off until step 5, then
+  on: an unload would read as a break". Not a switch: it belongs to the
+  program (Program → Edit, below). Connecting sends it off; START sends it as the
+  program starts.
+- **Peak** — an on/off **switch** with the state in words (operator,
+  2026-10-19: "a switch, easy for everyone to understand"). The controller does
+  not report it, so the program *sets* it as it connects, at START and on every
+  flip. **Obeyed, never reset** (operator, 2026-10-20): it opens at the saved
+  setting (off by default) and a flip is saved. Flipped while not connected it
+  is applied on connecting; during a test it is locked.
 - **Connect** / **Disconnect**.
 
-The test bar: the test's phase; **Piston: going down / still / going up** with
-its rate, large, from the Path readings of the last 2 s — after a STOP the
-operator must see whether the piston has started sinking (operator,
-2026-10-20); the ramp — control (Path or Force), speed, end,
-and the press file's limit beside it (an edit is saved as the settings' ramp);
-and the buttons, named as the operator asked (2026-10-19):
+The test bar, one row as the operator drew it (2026-11-09): the test's phase
+or step, and under it **Piston: going down / still / going up** with its rate,
+large, from a line fitted to the Path readings of the last 5 s — after a STOP
+the operator must see whether the piston has started sinking (operator,
+2026-10-20). "Still" is under 0.6 mm/min at rest (a resting piston drifts up to
+±0.43 for a second or two), but under 0.1 mm/min while a test runs: under a
+Force ramp on concrete the piston moves only 0.4–0.7 mm/min, and it read
+"still"; in a hold it may creep (operator, 2026-11-09); **the
+program drawn**, with **Edit** in its bottom-right corner; **Program**, the
+program in words a line each; and the buttons, at the top of the bar and
+named as the operator asked (2026-10-19):
 
 | Button | Sends | Notes |
 | --- | --- | --- |
-| **START** | `#B47`; on `#O`: Peak and break detection as the switches stand (`#B33` then the threshold `#D21…`), the start load `#D09…`, `#B23` | approach to the start load; off when the ramp is outside the limits, with the reason shown |
-| **CONTINUE** (after the start load) | the interval `#D05…`, the ramp `#D12…`; on `#B35`: `#B22` | the test itself |
-| **PAUSE** / **CONTINUE** (during the ramp) | `#B18` | one toggling command; freezes the ramp's target |
+| **START** | `#B47`; on `#O`: Peak as the switch stands, break detection as the program starts (`#B33` then the threshold `#D21…`, or `#B32`), the start load `#D09…`, `#B23` | approach to the start load; off when a step of the program cannot run, with the reason shown |
+| **CONTINUE** (after the start load) | the program's first step: the interval `#D05…`, the ramp `#D12…`; on `#B35`: `#B22` | the test itself; the steps after it follow by themselves |
+| **PAUSE** / **CONTINUE** (during a ramp) | `#B18` | one toggling command; freezes the ramp's target; off during a hold |
 | **STOP** | `#B17` | Proteus' "Cancel": pump off, load released. The real stop |
+
+**The program drawn**, in a frame: force against time as planned (one block
+per step when a Path step is in it), the steps under break detection shaded;
+while a test runs, the part done is filled in and a line marks now. The test's
+line says the step: "Step 8 of 15 — hold at 200 kN, 6 s left".
+
+### The program (operator, 2026-11-09)
+
+**Edit** opens the program as a list of steps the operator builds
+("a dynamic list of steps where they should be able to add/remove steps"):
+
+- Each **ramp** has its own control: **Force** "to [ ] kN at [ ] kN/s", the
+  arrow saying up or down from where the step before ended, or **Path** "to
+  [ ] mm" (a position) or "by [ ] mm" (a signed distance, counted as Proteus
+  counts it) "at [ ] mm/min". A **hold** is "[ ] s" at the force or position
+  reached. The measuring interval is the program's too.
+- Each row: **↑ ↓** move it, **Copy** duplicates it, **✕** removes it (not the
+  last). **+ Ramp** and **+ Hold** add steps. A line separates the rows
+  (operator, 2026-11-09).
+- **Break detection** is a ramp's "on from here"; every step after it shows "on
+  (stays on)".
+- Under a row, in red, **what stops it** — the same check START makes
+  (`control/program.py`): a rate above `[limits]`, an end outside the range or
+  below the start load, a ramp that would not move, an unload break detection
+  would read as a break, a program not starting with a ramp. **OK is off while
+  anything is red.** The lines a step sends are not shown (operator,
+  2026-11-09); the log shows them as they go.
+- The preview at the top, framed as in the control window, is the planned force
+  against time — or, once a
+  Path step is in it, one block per step (`P+2`, `10 s`, `F↑50`), as wide as
+  its planned time.
 
 **PAUSE is not a safety stop**: it freezes the ramp's target, so a piston that
 lags its target keeps going (step 22). STOP is Cancel: red, on the **Esc** key,
@@ -144,11 +184,10 @@ after a break the first press stops the pump, the next releases the load and the
 piston sinks, the next stops the sinking (step 33).
 
 **Settings…** (File menu, both windows, as DAqReader's): the screen's redraw
-ceiling, control mode's port, and the test — Proteus' template: Peak, break
-detection and its threshold, the start load, the ramp (Path and Force speed and
-end), its measuring interval, and the measuring interval before the ramp
-(both 100–500 ms). Saved to the global settings file only on OK;
-locked during a test.
+ceiling, control mode's port, and the test — what Proteus' template held besides
+the program: Peak, the break threshold, the start load, and the measuring
+interval before the program (100–500 ms). Saved to the global settings file only
+on OK; locked during a test.
 
 ## The window's frame (operator, 2026-10-20)
 

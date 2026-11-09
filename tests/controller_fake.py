@@ -5,7 +5,9 @@ streams measurement lines after ``#B37`` until ``#B36``, keeps PC mode, Peak and
 break detection, and can have its keypad STOP pressed. It also runs a test as
 steps 21, 23 and 26 show: ``#O`` to ``#B47``; ``#B01`` some time after the
 approach ``#B23``; ``#B35`` to a ramp and ``#O`` to ``#B22``; ``#B18`` toggling
-pause; ``#B02`` when the ramp reaches its end; ``#B43`` some time after Cancel.
+pause; ``#B02`` when each ramp reaches its end — up or down, as steps 36–38
+show, the next ramp of a program after ``#B26`` alone; ``#B43`` some time after
+Cancel.
 Everything written to it is kept, so a test can say exactly what was sent.
 """
 
@@ -40,6 +42,8 @@ class FakeController:
         self.break_detection = True    # the controller's default after power-up
         self.cancelled = 0
         self.ramp: str | None = None
+        self.ramps: list[str] = []
+        """Every ramp sent, in order: a program's ramps up and down."""
         self.ramp_running = False
         self.paused = False
         self.dtr = self.rts = None
@@ -132,6 +136,7 @@ class FakeController:
             self._later(self.approach_s, "#B01")
         elif line.startswith("#D12"):
             self.ramp = line
+            self.ramps.append(line)
             self._emit("#B35")
         elif line == "#B22":
             self.ramp_running = True

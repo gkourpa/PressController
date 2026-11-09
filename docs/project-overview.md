@@ -52,8 +52,11 @@ and undocumented, so the protocol is learnt from the live link first.
      ending by itself (`#B02` answered `#B26 #B17`) and the keypad STOP during a
      ramp (answered in 50 ms), both as planned. What remains is in
      [motion](motion.md#first-run-at-the-press--one-step-at-a-time-operators-hand-on-the-keypad-stop).
-   - **Later**: Proteus' UNLOAD and Cycle start elements, each after its own
-     recording (operator, 2026-10-20).
+   - **Programs (0.2.0, 2026-11-09)**: load cycles for EN 12390-13 — ramps
+     up and down, each Force or Path, and holds, built in Program → Edit, break
+     detection from a chosen step — learnt from Proteus' recordings (steps
+     35–41), written and tested line for line against steps 38 and 41. **Not
+     yet run from this program on the press.**
 4. A test editor, results and reports to replace what operators use in Proteus.
 5. Frozen Windows build and installer, as DAqReader's.
 

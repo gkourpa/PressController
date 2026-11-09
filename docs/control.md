@@ -69,10 +69,11 @@ the write point.
 
 ## A test
 
-See [motion](motion.md) for the sequence, the buttons state by state, and every
-way a test ends in Cancel. What START sends comes from the settings (Proteus'
-test template: Peak, break detection and threshold, start load, ramp, measuring
-interval), edited in File → Settings… and, for the ramp, in the window.
+See [motion](motion.md) for the sequence, the program's steps (ramps and holds:
+load cycles), the buttons state by state, and every way a test ends in Cancel.
+What START sends comes from the settings: Peak, the break threshold and the
+start load in File → Settings…, and the **program** — its ramps, holds, break
+detection and measuring interval — in the window's **Program → Edit**.
 
 ## Recording
 

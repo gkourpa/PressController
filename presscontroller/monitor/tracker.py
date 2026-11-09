@@ -9,12 +9,21 @@ PC ``#B47``           START pressed               a new test, ``ARMED``
 PC ``#B23``           approach starts             ``APPROACH``
 CTRL ``#B01``         start load reached          ``AT_START_LOAD``
 PC ``#D12…``          the ramp's definition       (kept on the test)
-PC ``#B22``           ramp starts                 ``RAMP``
+PC ``#B22``           ramp starts                 ``RAMP``, the next step
 CTRL ``#B02``         ramp end reached            ``RAMP_END``
+PC ``#B26``           ramp end answered           ``HOLD``: the force is held
 PC ``#B18``           PAUSE / CONTINUE (toggles)  ``HELD`` ⇄ the phase before
 PC ``#B17``           Cancel: pump off            ``CANCELLED``
 CTRL ``#B43``         load released               the test is closed
 ====================  ==========================  ==============================
+
+**A test is a program of steps** (steps 35–38): ramps up and down, and holds
+between them — ``#B26`` alone, the controller holding the force until the next
+ramp. Each ramp is measured on its own; the **step** each reading belongs to is
+counted as heard: every ramp started (``#B22``) and every hold with a reading
+in it is one more. (``#B26 #B17`` ends a test: no reading falls between them,
+so no step is counted.) A program starts with a ramp, so the count is the
+program's own step number.
 
 **A test stays open after Cancel** until the controller's ``#B43``, a new START,
 or Proteus leaving PC mode (``#B21``), so the unloading is part of its record:
@@ -61,6 +70,15 @@ RATE_WINDOW_S = 2.0
 PISTON_WINDOW_S = 5.0
 PISTON_STILL_MM_MIN = 0.6
 
+#: The same, while a test runs (operator, 2026-11-09). Under a Force ramp on
+#: concrete the piston only moves 0.4-0.7 mm/min (steps 38, 41; "path 0.48
+#: mm/min" in a control session) and read "still"; in a hold it may creep up to
+#: 1 mm/min after the ramp, or rest under 0.03 (step 38). The rest threshold is
+#: for the blips of a piston at rest — up to 0.43 mm/min for a second or two in
+#: 50 idle minutes (2026-10-20), nothing between 0.45 and 0.6 — and the only
+#: movement outside a test is sinking, 8-16 mm/min.
+PISTON_STILL_TEST_MM_MIN = 0.1
+
 #: Seconds at the start of a ramp left out of its measured rate. They are the
 #: servo taking up the load — 5.4 mm/min for a moment in a 3 mm/min ramp, force
 #: dipping and then jumping 8 kN at the start of a 2 kN/s ramp (step 21) — and
@@ -89,6 +107,7 @@ class Phase(Enum):
     AT_START_LOAD = "start load reached"
     RAMP = "ramp"
     RAMP_END = "ramp end reached"
+    HOLD = "hold"
     HELD = "paused"
     CANCELLED = "cancelled"
     CLOSED = "test over"
@@ -124,12 +143,24 @@ class TestRecord:
     t: list[float] = field(default_factory=list)
     counter: list[int] = field(default_factory=list)
     phase: list[str] = field(default_factory=list)
+    steps: list[int] = field(default_factory=list)
+    """The program step each reading belongs to; 0 before the first ramp."""
     raw: dict[int, list[int | None]] = field(default_factory=dict)
     events: list[tuple[float, str]] = field(default_factory=list)
     """``(test time, text)`` for every command and event heard during the test."""
+    step: int = 0
+    """The step now: one more for every ramp started and every hold."""
+    in_hold: bool = False
+    """Whether the hold now running has been counted as a step."""
     ramp: Ramp | None = None
+    """The newest ramp; those before it are summed up in :attr:`past_ramps`."""
+    ramp_number: int = 0
     ramp_from_mm: float | None = None
     """Where the piston was when the ramp was sent."""
+    ramp_from_kn: float | None = None
+    """The force when the ramp was sent: whether it goes up or down."""
+    past_ramps: list[str] = field(default_factory=list)
+    """Each earlier ramp of the test, as the CSV's summary gives it."""
     warnings: list[str] = field(default_factory=list)
     ramp_judged: bool = False
     """Whether the measured speed has been compared with the set one yet."""
@@ -150,9 +181,13 @@ class TestRecord:
         for idx in raw:
             if idx not in self.raw:
                 self.raw[idx] = [None] * n      # a channel appearing late has a gap before
+        if phase is Phase.HOLD and not self.in_hold:
+            self.in_hold = True
+            self.step += 1
         self.t.append(t)
         self.counter.append(counter)
         self.phase.append(phase.value)
+        self.steps.append(self.step)
         for idx, col in self.raw.items():
             col.append(raw.get(idx))            # and one missing from a line is a gap
 
@@ -181,6 +216,18 @@ class TestRecord:
 
     def pause_ramp(self) -> None:
         """The ramp's clock stops: the next ramp sample starts it again."""
+        self._ramp_last = None
+
+    def new_ramp(self, ramp: Ramp, from_mm: float | None, from_kn: float | None) -> None:
+        """A further ramp of the test: measured afresh, from its own start."""
+        self.ramp = ramp
+        self.ramp_number += 1
+        self.ramp_from_mm = from_mm
+        self.ramp_from_kn = from_kn
+        self.ramp_judged = False
+        self._fit = [0.0] * 5
+        self._fit_force = [0.0] * 5
+        self._ramp_clock = 0.0
         self._ramp_last = None
 
     @property
@@ -302,7 +349,7 @@ class Monitor:
         if test is None:
             return None
         loading = {Phase.AT_START_LOAD.value, Phase.RAMP.value, Phase.RAMP_END.value,
-                   Phase.HELD.value}
+                   Phase.HOLD.value, Phase.HELD.value}
         return next((i for i, ph in enumerate(test.phase) if ph in loading), None)
 
     def force_displacement(self, test: TestRecord | None) -> ForceDisplacement:
@@ -348,6 +395,34 @@ class Monitor:
             return None if mm_min is None else mm_min / 60.0
         return test.ramp_kn_s
 
+    def ramp_summary(self, test: TestRecord, *, numbered: bool | None = None) -> list[str]:
+        """``test``'s newest ramp as the CSV's summary gives it: what was sent,
+        where the piston was, and the rate it really ran at. Numbered (``ramp
+        2 sent: …``) when the test has more than one."""
+        if test.ramp is None:
+            return []
+        r = test.ramp
+        ch = self.press.channel(r.channel)
+        decoded = self.ramp_decoded(test)
+        if numbered is None:
+            numbered = test.ramp_number > 1
+        name = f"ramp {test.ramp_number}" if numbered else "ramp"
+        out = [f"{name} sent: channel {r.channel}"
+               + (f" ({ch.name})" if ch else "")
+               + f", speed {r.speed}, start {r.start}, end {r.end}, field4 {r.field4}"
+               + (f" = {rate_text(r.rate, ch.unit)} from {r.start_value:g} to "
+                  f"{r.end_value:g} {ch.unit} (thousandths of {ch.unit})"
+                  if decoded else " (units not decoded for this channel)")
+               + (f"; piston at {test.ramp_from_mm:.3f} mm when sent"
+                  if test.ramp_from_mm is not None else "")]
+        if test.ramp_mm_min is not None:
+            out.append(f"{name} measured: {test.ramp_mm_min:.3f} mm/min over "
+                       f"{test.ramp_seconds:.1f} s (least squares, path against time)")
+        if test.ramp_kn_s is not None:
+            out.append(f"{name} measured: {test.ramp_kn_s:.3f} kN/s over "
+                       f"{test.ramp_seconds:.1f} s (least squares, force against time)")
+        return out
+
     def rate(self, index: int | None) -> float | None:
         """Units per second over the last :data:`RATE_WINDOW_S`, or ``None``."""
         if index is None or len(self._recent) < 2:
@@ -365,7 +440,10 @@ class Monitor:
 
         After a STOP the operator needs to see whether the piston has started
         sinking (operator, 2026-10-20); a path reading wandering by a few µm is
-        not movement, so under :data:`PISTON_STILL_MM_MIN` it is "still".
+        not movement, so under :data:`PISTON_STILL_MM_MIN` it is "still" — or,
+        while a test runs, under :data:`PISTON_STILL_TEST_MM_MIN`: there the
+        piston under a Force ramp, or creeping in a hold, may move no faster
+        than a resting one blips.
         """
         pts = self._path_recent
         if len(pts) < 3 or pts[-1][0] - pts[0][0] < PISTON_WINDOW_S / 2:
@@ -377,7 +455,8 @@ class Monitor:
         if den <= 0:
             return None
         mm_min = 60 * sum((t - mt) * (p - mp) for t, p in pts) / den
-        if abs(mm_min) < PISTON_STILL_MM_MIN:
+        still = PISTON_STILL_TEST_MM_MIN if self.current is not None else PISTON_STILL_MM_MIN
+        if abs(mm_min) < still:
             return "still", 0.0
         return ("going up" if mm_min > 0 else "going down"), mm_min
 
@@ -457,7 +536,8 @@ class Monitor:
         measured, wanted = self.ramp_measured(test), test.ramp.rate
         if measured is None or wanted <= 0:
             return []
-        if abs(measured - wanted) <= RAMP_SPEED_TOLERANCE * wanted:
+        # A ramp down runs at the same speed, falling (step 36: -1.96 kN/s set 2).
+        if abs(abs(measured) - wanted) <= RAMP_SPEED_TOLERANCE * wanted:
             return []
         unit = self.press.channel(test.ramp.channel).unit
         text = (f"The ramp is running at {rate_text(measured, unit)}, not the "
@@ -490,8 +570,15 @@ class Monitor:
                 self._ensure_test(ev)
                 self.phase = Phase.APPROACH
             case Command(22):
-                self._ensure_test(ev)
+                test = self._ensure_test(ev)
+                test.step += 1
+                test.in_hold = False
                 self.phase = Phase.RAMP
+            case Command(26):
+                # The ramp's end answered. Alone, the controller holds the force
+                # until the next ramp (steps 36-38); #B17 right after ends the test.
+                if self.phase is Phase.RAMP_END:
+                    self.phase = Phase.HOLD
             case Command(18):
                 # One button and one command in Proteus, toggling (operator,
                 # 2026-10-19; step 23): pause, then continue where it was.
@@ -537,8 +624,10 @@ class Monitor:
         measured instead, and :meth:`_judge_ramp` is the warning that matters.
         """
         test = self._ensure_test(ev)
-        test.ramp = ramp
-        test.ramp_from_mm = self.latest_value(self.path_index)
+        if test.ramp is not None:
+            test.past_ramps += self.ramp_summary(test, numbered=True)
+        test.new_ramp(ramp, self.latest_value(self.path_index),
+                      self.latest_value(self.force_index))
         return self._check_limits(test)
 
     def _check_limits(self, test: TestRecord) -> list[Notice]:

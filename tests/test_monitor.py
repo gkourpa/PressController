@@ -254,7 +254,8 @@ def test_a_ramp_left_to_reach_its_end(press):
     assert test.ramp == Ramp(2000, 0, 100000, 0, 0)
     assert m.unknown_lines == 0
     assert [e.meaning for e in m.log if e.text in ("#B02", "#B26")] == [
-        "ramp end reached", "test finished (answer to ramp end)?"]
+        "ramp end reached",
+        "answer to ramp end: the force is held (#B17 after it ends the test)"]
     assert m.peak(test)[0] == pytest.approx(99.67, abs=0.01)
     # Proteus cancels 20 ms after #B02, before the next sample, so the phase is
     # seen at the moment #B02 is heard rather than on any sample.
@@ -352,4 +353,94 @@ def test_a_still_piston_reads_still_without_flickering(press):
         p = m.piston()
         if p is not None:
             words.add(p[0])
+    assert words == {"still"}
+
+
+def test_a_load_cycle_is_followed_step_by_step(press):
+    # Step 38: 2 kN/s to 200 kN, hold 10 s, down to 100 kN, hold 10 s, break
+    # detection on, 4 kN/s to 250 kN; then the unloading's #B27 and Proteus'
+    # #B34, answered #D07+ 250.4.
+    from tests.conftest import FORCE_CYCLE
+    m, notices = replay_all(press, FORCE_CYCLE)
+    test = m.tests[0]
+    assert m.unknown_lines == 0
+    assert not any(n.warn for n in notices) and test.warnings == []   # the ramp down too
+    assert [e.meaning for e in m.log if e.text.startswith("#D07")] == ["peak force + 250.4 kN?"]
+    # Each reading's step: 0 until the first ramp, then ramp, hold, ramp, hold, ramp.
+    assert sorted(set(test.steps)) == [0, 1, 2, 3, 4, 5]
+    holds = {s for s, ph in zip(test.steps, test.phase) if ph == Phase.HOLD.value}
+    assert holds == {2, 4}
+    # The holds held: 199.79-200.13 kN and 99.75-100.06 kN.
+    forces = m.series(test, m.force_index)
+    for step, lo, hi in ((2, 199.7, 200.2), (4, 99.7, 100.1)):
+        held = [f for f, s, ph in zip(forces, test.steps, test.phase)
+                if s == step and ph == Phase.HOLD.value]
+        assert lo <= min(held) and max(held) <= hi
+    # Each ramp measured on its own; the earlier ones kept for the CSV.
+    assert test.ramp_number == 3 and test.ramp == Ramp(4000, 0, 250000, 0, 0)
+    assert test.ramp_kn_s == pytest.approx(3.96, abs=0.05)
+    # Sent, then measured against path and against force.
+    assert [ln.split(":")[0] for ln in test.past_ramps] == [
+        "ramp 1 sent", "ramp 1 measured", "ramp 1 measured",
+        "ramp 2 sent", "ramp 2 measured", "ramp 2 measured"]
+    assert test.past_ramps[5].startswith("ramp 2 measured: -1.96")
+    assert m.peak(test)[0] == pytest.approx(250.01, abs=0.01)
+
+
+def test_mixed_path_and_force_steps_are_followed(press):
+    from tests.conftest import PATH_AND_FORCE
+    m, notices = replay_all(press, PATH_AND_FORCE)
+    test = m.tests[-1]
+    assert m.unknown_lines == 0
+    assert sorted(set(test.steps)) == [0, 1, 2, 3, 4, 5]
+    assert test.ramp_number == 3 and test.ramp == Ramp(2000, 0, 50000, 0, 0)
+    assert [ln.split(":")[0] for ln in test.past_ramps if "sent" in ln] == [
+        "ramp 1 sent", "ramp 2 sent"]
+    # The glued "#O#D08..." (step 41) is read as the two lines it was.
+    assert [e.text for e in m.log if e.text == "#O"]
+    # The Force ramp after the Path steps ran faster than set at first; said once.
+    assert [n.text[:42] for n in notices if n.warn] == [
+        "The ramp is running at 2.52 kN/s, not the "]
+
+
+def test_a_piston_moving_slowly_under_a_force_ramp_is_not_called_still(press):
+    # 2026-11-09: under a Force ramp on concrete the piston moves 0.4-0.7
+    # mm/min, at the rest threshold; the label said "still" for most of step
+    # 38's ramps (1514 of 1676 readings) although the press was loading.
+    from presscontroller.monitor import Monitor
+    from presscontroller.monitor.tracker import Phase
+    from presscontroller.tap import read_capture
+    from tests.conftest import FORCE_CYCLE
+    m = Monitor(press)
+    words, start = set(), None
+    for ev in read_capture(FORCE_CYCLE):
+        m.feed(ev)
+        if m.phase is Phase.RAMP and m.current is not None:
+            start = ev.t if start is None else start
+            p = m.piston()
+            if p is not None and ev.t - start > 5.0:        # a whole window into the ramp
+                words.add(p[0])
+        else:
+            start = None
+    assert words == {"going up", "going down"}
+
+
+def test_a_piston_at_rest_in_a_hold_reads_still(press):
+    # Step 38's holds: the force held to 0.3 kN and the 5 s fit stayed under
+    # 0.03 mm/min, below the test's threshold of 0.1.
+    from presscontroller.monitor import Monitor
+    from presscontroller.monitor.tracker import Phase
+    from presscontroller.tap import read_capture
+    from tests.conftest import FORCE_CYCLE
+    m = Monitor(press)
+    words, start = set(), None
+    for ev in read_capture(FORCE_CYCLE):
+        m.feed(ev)
+        if m.phase is Phase.HOLD:
+            start = ev.t if start is None else start
+            p = m.piston()
+            if p is not None and ev.t - start > 5.0:
+                words.add(p[0])
+        else:
+            start = None
     assert words == {"still"}

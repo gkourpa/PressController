@@ -22,16 +22,14 @@ sends ``#B28`` and leaves it to the PC (docs/PROTOCOL.md). The session answers i
 the way that keeps the operator in charge: Cancel (pump off), then stream off and
 PC mode off, so the keypad works locally again at once.
 
-**Peak and break detection are switches with a known state.** The controller
-does not report them, and Proteus never sets them at start-up, so whatever an
-earlier session left is in force. The session therefore keeps the state the
-operator wants (:attr:`ControllerSession.peak`,
-:attr:`ControllerSession.break_detection`) and **sends it right after
-connecting** and on every change, so a switch on screen can never disagree with
-the controller (operator, 2026-10-19: "a switch, easy for everyone to
-understand"). Break detection starts on — the controller's own power-up default,
-and the one that stops the press when a specimen fails; Peak starts off, its
-power-up default too.
+**Peak and break detection have a known state.** The controller does not
+report them, and Proteus never sets them at start-up, so whatever an earlier
+session left is in force (step 37: break detection left on by the test before).
+Peak is the operator's switch (:attr:`ControllerSession.peak`), **sent right
+after connecting** and on every change (operator, 2026-10-19: "a switch, easy
+for everyone to understand"). Break detection belongs to the test's program
+(:mod:`~presscontroller.control.program`): connecting sends it off, and every
+START sends it as the program's first step wants it.
 
 **Disconnect** — and closing, which always disconnects first — sends the stream
 off and PC mode off, as Proteus does when it exits.
@@ -43,19 +41,27 @@ off and PC mode off, as Proteus does when it exits.
   different setting is sent once connected, and after every test, since the
   ramp's ``#D05…`` stays in force when the test ends. Nothing is sent when
   the interval in force is already the one wanted.
-* :meth:`ControllerSession.start_test` builds every line the test will need
-  from the settings first — the ramp against the press file's limits — and
-  sends nothing if one is refused. Then ``#B47``; on the controller's ``#O``,
-  Peak and break detection **as the switches stand** (``#B33`` followed by the
-  break threshold ``#D21…``), the start load ``#D09…`` and the approach ``#B23``.
+* :meth:`ControllerSession.start_test` plans the program first
+  (:func:`~presscontroller.control.program.plan_program`) — every ramp against
+  the press file's limits, every step checked — and sends nothing if any of it
+  is refused. Then ``#B47``; on the controller's ``#O``, Peak as the switch
+  stands and break detection as the program starts (``#B33`` followed by the
+  break threshold ``#D21…``, or ``#B32``), the start load ``#D09…`` and the
+  approach ``#B23``.
 * ``#B01`` — the start load reached — waits for CONTINUE
-  (:meth:`ControllerSession.continue_test`): the measuring interval ``#D05…``
-  and the ramp; on the controller's ``#B35``, ``#B22``; on its ``#O``, the ramp
-  runs.
-* PAUSE and CONTINUE during the ramp are both ``#B18``, which toggles.
-  **PAUSE is not a stop**: it freezes the ramp's target (step 22).
-* The controller's ``#B02`` (the ramp's end) is answered as Proteus does,
-  ``#B26 #B17``.
+  (:meth:`ControllerSession.continue_test`), which starts the program's first
+  step. A ramp — Force or Path: the measuring interval ``#D05…`` and the ramp
+  (after ``#B33 #D21…`` if it switches break detection on); on the controller's
+  ``#B35``, ``#B22``; on its ``#O``, the ramp runs. A Path ramp "by" a distance
+  gets its end here, as it is sent: the previous Path ramp's set end, or the
+  piston's position from the newest reading, plus the distance (steps 39–41).
+* PAUSE and CONTINUE during a ramp are both ``#B18``, which toggles.
+  **PAUSE is not a stop**: it freezes the ramp's target (step 22). A hold
+  cannot be paused: ``#B18`` during one was never recorded.
+* The controller's ``#B02`` (a ramp's end) is answered as Proteus does:
+  ``#B26`` alone, and the next step starts — a hold timed here, or the next
+  ramp; ``#B26 #B17`` after the last step. A hold that is the last step ends
+  with ``#B17``.
 * **STOP is ``#B17``** — Proteus' Cancel, pump off — and so is every way a test
   can go wrong: an answer that does not come, a controller line no recording
   explains (it may be how the controller tells a break), the readings stopping,
@@ -78,6 +84,7 @@ from presscontroller.control import commands as cmd
 from presscontroller.config.settings import TemplateSettings
 from presscontroller.control.commands import NotAllowed
 from presscontroller.control.link import ControllerLink
+from presscontroller.control.program import FROM_PREVIOUS, PlannedStep, Program, plan_program
 from presscontroller.protocol import CTRL_TO_PC, Ack, Command, Sample, parse
 from presscontroller.tap.events import TapEvent
 
@@ -123,23 +130,11 @@ class RunPhase(Enum):
     STARTING_RAMP = "sending the ramp"
     RAMP = "ramp running"
     PAUSED = "paused (PAUSE holds the ramp's target, not the piston)"
+    HOLD = "holding the force (timed by this program)"
 
 
 #: The phases in which a test is running and STOP is the way out.
 RUNNING = frozenset(set(RunPhase) - {RunPhase.NONE})
-
-
-@dataclass(frozen=True)
-class RunLines:
-    """Every line a test will send that is built from settings, built before
-    the first byte goes, so a refused value stops nothing midway."""
-
-    switches: tuple[str, ...]
-    start_load: str
-    interval: str
-    ramp: str
-    told: str
-    """The ramp in words: ``Path 2 mm/min to 100 mm``."""
 
 
 @dataclass(frozen=True)
@@ -167,16 +162,22 @@ class ControllerSession:
         self._silent_said = False
         self.peak = False
         """Peak detection as the operator wants it; sent on connect and on change."""
-        self.break_detection = True
-        """Break detection as the operator wants it; sent on connect and on change."""
         self.idle_interval_ms = cmd.STARTUP_INTERVAL_MS
         """The measuring interval wanted before the ramp; sent on connect if
         not the start-up's, and after every test."""
         self._interval_ms = 0
         """The interval in force, as last sent; 0 when unknown."""
         self.test = RunPhase.NONE
-        self.plan: RunLines | None = None
-        """The running test's lines; ``None`` between tests."""
+        self.plan: Program | None = None
+        """The running test's program; ``None`` between tests."""
+        self.step: int | None = None
+        """The running step's index in :attr:`plan`; ``None`` before the first."""
+        self._hold_until = 0.0
+        self._step_started = 0.0
+        self._path_now: float | None = None
+        """The piston's position from the newest reading, mm."""
+        self._path_set_end: float | None = None
+        """The end the running test's newest Path ramp was sent with, mm."""
         self._await = ""
         self._test_deadline = 0.0
         self._carry: list[TapEvent] = []
@@ -234,12 +235,6 @@ class ControllerSession:
         if self.state is SessionState.CONNECTED:
             self.link.send(cmd.PEAK_ON if self.peak else cmd.PEAK_OFF)
 
-    def set_break_detection(self, on: bool) -> None:
-        """Want break detection on or off; sent now if connected, else on connecting."""
-        self.break_detection = bool(on)
-        if self.state is SessionState.CONNECTED:
-            self.link.send(cmd.BREAK_ON if self.break_detection else cmd.BREAK_OFF)
-
     def set_idle_interval(self, ms: int) -> None:
         """Want ``ms`` before the ramp; sent now if connected and no test runs."""
         self.idle_interval_ms = int(ms)
@@ -259,59 +254,82 @@ class ControllerSession:
         self._interval_ms = self.idle_interval_ms
 
     def _apply_switches(self) -> None:
+        # Break detection off until a program's START says otherwise: a known
+        # state, whatever an earlier session left (step 37).
         self.link.send(cmd.PEAK_ON if self.peak else cmd.PEAK_OFF)
-        self.link.send(cmd.BREAK_ON if self.break_detection else cmd.BREAK_OFF)
+        self.link.send(cmd.BREAK_OFF)
 
     # ---- the test ------------------------------------------------------------
 
-    def build_lines(self, t: TemplateSettings) -> RunLines:
-        """Every built line of a test from ``t`` and the switches; raises
-        :class:`~presscontroller.control.commands.NotAllowed`, saying why."""
-        switches = [cmd.PEAK_ON if self.peak else cmd.PEAK_OFF]
-        if self.break_detection:
-            switches += [cmd.BREAK_ON, cmd.break_threshold_line(t.break_threshold_per_mil)]
-        else:
-            switches.append(cmd.BREAK_OFF)
-        if t.ramp_control == "path":
-            speed, end = t.path_speed_mm_min, t.path_end_mm
-            told = f"Path {speed:g} mm/min to {end:g} mm"
-        else:
-            speed, end = t.force_speed_kn_s, t.force_end_kn
-            told = f"Force {speed:g} kN/s to {end:g} kN"
-        return RunLines(switches=tuple(switches),
-                         start_load=cmd.start_load_line(t.start_load_percent),
-                         interval=cmd.interval_line(t.measuring_interval_ms),
-                         ramp=cmd.ramp_line(self.link.limits, t.ramp_control, speed, end),
-                         told=told)
+    def plan_for(self, t: TemplateSettings) -> Program:
+        """``t``'s program with the press file's limits and the Peak switch:
+        every line built, every step checked (never raises)."""
+        return plan_program(t, self.link.limits, peak=self.peak)
 
     def can_start(self) -> bool:
         return self.state is SessionState.CONNECTED and self.test is RunPhase.NONE
 
+    @property
+    def current_step(self) -> PlannedStep | None:
+        if self.plan is None or self.step is None:
+            return None
+        return self.plan.steps[self.step]
+
+    def hold_left(self) -> float | None:
+        """Seconds left of the running hold, ``None`` when none runs."""
+        if self.test is not RunPhase.HOLD:
+            return None
+        return max(0.0, self._hold_until - self._clock())
+
+    @property
+    def path_set_end(self) -> float | None:
+        """The end the running test's newest Path ramp was sent with, mm."""
+        return self._path_set_end if self.plan is not None else None
+
+    def step_fraction(self) -> float | None:
+        """How far the running step is through its planned length, 0–1;
+        ``None`` when its length is not known."""
+        st = self.current_step
+        if st is None or not st.seconds:
+            return None
+        return min(1.0, (self._clock() - self._step_started) / st.seconds)
+
+    def program_elapsed(self) -> float | None:
+        """Where the test is on the program's planned time line, in seconds: the
+        planned length of the steps done, plus the running step's time so far
+        (no more than its planned length). ``None`` before the first step or
+        when a step's length cannot be planned (a path ramp)."""
+        if self.plan is None or self.step is None:
+            return None
+        done = [s.seconds for s in self.plan.steps[:self.step]]
+        here = self.plan.steps[self.step].seconds
+        if here is None or any(d is None for d in done):
+            return None
+        return sum(done) + min(here, self._clock() - self._step_started)
+
     def start_test(self, t: TemplateSettings) -> bool:
-        """START: ``#B47``, then on ``#O`` the switches, the start load and the
-        approach. Nothing is sent if any line of the test is refused."""
+        """START: ``#B47``, then on ``#O`` Peak, break detection, the start load
+        and the approach. Nothing is sent if any part of the program is refused."""
         if not self.can_start():
             return False
-        try:
-            plan = self.build_lines(t)
-        except NotAllowed as exc:
-            self._say(f"START refused, nothing sent: {exc}.", "error")
+        plan = self.plan_for(t)
+        if not plan.ok:
+            self._say(f"START refused, nothing sent: {'; '.join(plan.problems)}.", "error")
             return False
         self.plan = plan
+        self.step = None
+        self._path_set_end = None
         self.link.send(cmd.START)
         self._expect(RunPhase.ARMING, "#O")
-        self._say(f"START: {plan.told}. Waiting for the controller…")
+        self._say(f"START: {plan.told()}. Waiting for the controller…")
         return True
 
     def continue_test(self) -> bool:
-        """CONTINUE: at the start load, send the ramp; while paused, ``#B18``."""
+        """CONTINUE: at the start load, start the program; while paused, ``#B18``."""
         if self.state is not SessionState.CONNECTED:
             return False
         if self.test is RunPhase.AT_START_LOAD and self.plan is not None:
-            self.link.send(self.plan.interval)
-            self._interval_ms = int(self.plan.interval[4:]) * 10
-            self.link.send(self.plan.ramp)
-            self._expect(RunPhase.STARTING_RAMP, "#B35")
+            self._begin_step(0)
             return True
         if self.test is RunPhase.PAUSED:
             self.link.send(cmd.PAUSE_CONTINUE)
@@ -347,9 +365,63 @@ class ControllerSession:
         self._await = line
         self._test_deadline = self._clock() + REPLY_TIMEOUT_S
 
+    def _begin_step(self, i: int) -> None:
+        """Start the program's step ``i``: a ramp's lines, or a hold's timer."""
+        assert self.plan is not None
+        self.step = i
+        self._step_started = self._clock()
+        st = self.plan.steps[i]
+        n = len(self.plan.steps)
+        where = f"Step {st.number} of {n}: " if n > 1 else ""
+        if st.kind == "hold":
+            self.test = RunPhase.HOLD
+            self._await = ""
+            self._hold_until = self._clock() + st.hold_s
+            self._say(f"{where}{st.told}. PAUSE is not available during a hold; STOP is.")
+            return
+        lines = st.lines
+        if st.path_by is not None:
+            # Proteus' reading of "+4 mm" (steps 39-41): from the previous Path
+            # ramp's set end, else from the piston as the ramp is sent.
+            base = (self._path_set_end if st.path_from == FROM_PREVIOUS
+                    else self._path_now)
+            if base is None:
+                self._stop_for(f"step {st.number} is a Path ramp by {st.path_by:+g} mm and "
+                               "the piston's position is not known")
+                return
+            end = round(base + st.path_by, 3)
+            try:
+                lines = lines + (cmd.ramp_line(self.link.limits, "path", st.speed, end),)
+            except NotAllowed as exc:
+                self._stop_for(f"step {st.number}, to {end:g} mm: {exc}")
+                return
+            self._path_set_end = end
+        elif st.control == "path":
+            self._path_set_end = st.to_value
+        for line in lines:
+            self.link.send(line)
+            if line.startswith("#D05"):
+                self._interval_ms = int(line[4:]) * 10
+        if st.switches_break_on and n > 1:
+            self._say(f"{where}break detection on from here.")
+        self._expect(RunPhase.STARTING_RAMP, "#B35")
+
+    def _step_done(self) -> None:
+        """The running step ended (a ramp's ``#B02`` answered, or a hold's
+        time up): the next step, or the end of the test."""
+        assert self.plan is not None and self.step is not None
+        last = self.step == len(self.plan.steps) - 1
+        if not last:
+            self._begin_step(self.step + 1)
+            return
+        self.link.send(cmd.CANCEL)
+        self._end_test()
+        self._restore_interval()
+
     def _end_test(self) -> None:
         self.test = RunPhase.NONE
         self.plan = None
+        self.step = None
         self._await = ""
 
     def _stop_for(self, why: str) -> None:
@@ -365,15 +437,19 @@ class ControllerSession:
         if isinstance(msg, Ack):
             if self.test is RunPhase.ARMING and self._await == "#O":
                 assert self.plan is not None
-                self._send_all(self.plan.switches + (self.plan.start_load, cmd.APPROACH))
+                self._send_all(self.plan.start_switches
+                               + (self.plan.start_load, cmd.APPROACH))
                 self.test = RunPhase.APPROACH
                 self._await = ""
                 self._say("Approaching the specimen…")
             elif self.test is RunPhase.STARTING_RAMP and self._await == "#O":
                 self.test = RunPhase.RAMP
                 self._await = ""
-                self._say(f"Ramp running: {self.plan.told if self.plan else ''}. "
-                          "STOP (or Esc) stops the pump.")
+                st = self.current_step
+                n = len(self.plan.steps) if self.plan else 1
+                told = (f"step {st.number} of {n}, {st.told}" if st is not None and n > 1
+                        else self.plan.told() if self.plan else "")
+                self._say(f"Ramp running: {told}. STOP (or Esc) stops the pump.")
             return
         if isinstance(msg, Command) and msg.code == 27:
             # After a break the controller holds the load (step 32). This first
@@ -400,10 +476,14 @@ class ControllerSession:
             self.link.send(cmd.RAMP_GO)
             self._expect(RunPhase.STARTING_RAMP, "#O")
         elif msg.code == 2 and self.test in (RunPhase.RAMP, RunPhase.PAUSED):
-            self._send_all((cmd.RAMP_END_ANSWER, cmd.CANCEL))
-            self._end_test()
-            self._restore_interval()
-            self._say("The ramp reached its end: answered as Proteus does (#B26), pump off.")
+            # Proteus answers every ramp end #B26; alone, the controller then
+            # holds the force (steps 36-38); #B17 after it ends the test.
+            self.link.send(cmd.RAMP_END_ANSWER)
+            last = self.plan is None or self.step == len(self.plan.steps) - 1
+            self._step_done()
+            if last:
+                self._say("The program reached its end: answered as Proteus does "
+                          "(#B26), pump off.")
 
     # ---- the tick ------------------------------------------------------------
 
@@ -461,9 +541,9 @@ class ControllerSession:
                     self._apply_switches()
                     self._restore_interval()
                     self._say("Connected: the controller is in PC mode and streaming; Peak "
-                              f"{'on' if self.peak else 'off'}, break detection "
-                              f"{'on' if self.break_detection else 'off'}. START begins a "
-                              "test; STOP (or Esc) stops the pump.")
+                              f"{'on' if self.peak else 'off'}, break detection off until "
+                              "a test's program sets it. START begins a test; STOP (or "
+                              "Esc) stops the pump.")
                 else:
                     self._abort("the controller streamed before it was asked to")
                 return
@@ -473,6 +553,9 @@ class ControllerSession:
             if isinstance(msg, Sample):
                 self._last_sample = now
                 self._silent_said = False
+                limits = self.link.limits
+                if limits is not None and limits.path_channel in msg.raw:
+                    self._path_now = limits.path_mm(msg.raw[limits.path_channel])
             if self.test in RUNNING:
                 self._heard_in_test(ev, msg)
 
@@ -506,6 +589,12 @@ class ControllerSession:
                         f"(got {self._got}, expected {list(cmd.STARTUP_REPLIES[self._group])})")
                 self._abort(what)
         elif self.state is SessionState.CONNECTED:
+            if self.test is RunPhase.HOLD and now >= self._hold_until:
+                last = self.plan is None or self.step == len(self.plan.steps) - 1
+                self._step_done()
+                if last:
+                    self._say("The program's last hold ended: pump off, load released "
+                              "(Cancel).")
             if self.test in RUNNING:
                 if self._await and now >= self._test_deadline:
                     self._stop_for(f"the controller did not answer {self._await} within "

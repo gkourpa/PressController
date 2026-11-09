@@ -12,6 +12,7 @@ from presscontroller.protocol.messages import (
     BreakThreshold,
     Command,
     Message,
+    PeakValue,
     Ramp,
     Reply,
     ReportLine,
@@ -25,6 +26,6 @@ from presscontroller.protocol.messages import (
 
 __all__ = [
     "Ack", "BreakThreshold", "CTRL_TO_PC", "DECODED_RAMP_CHANNELS", "Command", "DIRECTIONS", "LineAssembler", "Message",
-    "PC_TO_CTRL", "Ramp", "Reply", "ReportLine", "Sample", "SetParam", "Unknown", "describe",
+    "PC_TO_CTRL", "PeakValue", "Ramp", "Reply", "ReportLine", "Sample", "SetParam", "Unknown", "describe",
     "parse", "rate_text",
 ]

@@ -2,6 +2,38 @@
 
 What each version added or changed, newest first.
 
+## 0.2.0 — 2026-11-09
+
+### Added
+
+- **Programs: load cycles (EN 12390-13).** The test after the start load is a
+  program the operator builds in **Program → Edit**: ramps up and down and
+  holds, as many as wanted, added, removed, moved and copied. Each ramp is
+  **Force** (to kN) or **Path** (to a position, or by a distance, counted as
+  Proteus counts it). A step that could not run says why, in red (a rate above
+  the press limit, a ramp that would not move, an unload break detection would
+  read as a break). Learnt from Proteus' recordings, steps 35–41.
+- The control window draws the program — force against time as planned,
+  filled in as the test runs — and says the step, a hold's seconds left and
+  the next step.
+- The CSV has a **step** column, and its summary gives every ramp with its
+  measured rate.
+
+### Changed
+
+- **Break detection belongs to the program**: from a chosen ramp on. The switch is gone; the window says what the
+  program sets. Connecting sends it off, and every START sends it as the
+  program starts — the controller keeps its last state across tests (step 37).
+- The ramp boxes in the test bar, and the ramp and measuring interval in
+  Settings → Test, moved into Program → Edit.
+- PAUSE is off during a hold.
+
+### Fixed
+
+- The controller can glue its `#O` to a measurement line with no line break
+  (step 41); it was read as one unknown line, which would have stopped a test
+  at the ramp. A `#` now starts a new line.
+
 ## 0.1.2 — 2026-10-22
 
 ### Changed

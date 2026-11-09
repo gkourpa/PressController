@@ -158,3 +158,11 @@ def test_the_controllers_own_report_is_read_as_its_lines():
 
 def test_a_line_not_in_the_notes_is_said_once():
     assert describe(CTRL_TO_PC, Unknown("#X")) == ""
+
+
+def test_a_reply_glued_to_a_measurement_line_is_two_lines():
+    # Step 41 (2026-11-09): the controller's #O with no terminator, a stream
+    # line straight after it, then both terminators.
+    a = LineAssembler(CTRL_TO_PC)
+    got = a.feed(b"#O#D0812703;0;1582;1;388181;2;-26487\r\n\r\n", 5.0)
+    assert [text for _, text in got] == ["#O", "#D0812703;0;1582;1;388181;2;-26487"]

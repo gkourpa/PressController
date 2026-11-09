@@ -16,6 +16,12 @@ Ending lines only at ``CR LF`` read that as one unknown line ``#O
 #D08…``; ending
 at either byte reads ``#O`` and the measurement line, as they were meant.
 
+**A ``#`` also starts a new line.** In step 41 (2026-11-09) the controller sent
+its ``#O`` with no terminator at all, a measurement line straight after it, then
+both terminators: ``#O#D0812703;…`` CR LF CR LF. Every message begins with
+``#`` and none has one inside (the controller's own report has none either), so
+a ``#`` after other bytes ends the line before it.
+
 **A line is stamped with the arrival of its first byte**, not its last. At
 9600 baud a 34-byte stream line takes 35 ms to arrive, and the moment the
 controller started sending it is the closer of the two to when it measured.
@@ -37,6 +43,8 @@ TERMINATOR = b"\r\n"
 """What every line is sent with. Either byte of it ends a line read."""
 
 _ENDS = (0x0D, 0x0A)
+_HASH = 0x23
+"""``#``: every message begins with it and none has one inside."""
 
 #: A line longer than this without a terminator is noise or a wrong baud rate,
 #: not a message: the longest one seen is the 35-byte stream line. It is handed
@@ -61,11 +69,12 @@ class LineAssembler:
         """
         out: list[tuple[float, str]] = []
         for byte in data:
-            if byte in _ENDS:
+            if byte in _ENDS or (byte == _HASH and self._buf):
                 if self._buf:
                     out.append((self._t0, _text(bytes(self._buf))))
                     self._buf.clear()
-                continue
+                if byte != _HASH:
+                    continue
             if not self._buf:
                 self._t0 = t
             self._buf.append(byte)

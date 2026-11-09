@@ -20,7 +20,9 @@ controller sent: ``value = raw × range / resolution``. A press file edited late
 must not leave old tests unreadable.
 
 Columns: ``t_s`` (seconds since START), ``time`` (wall clock), ``counter`` (the
-controller's own 10 ms clock), ``phase``, then ``<channel>_<unit>`` and
+controller's own 10 ms clock), ``phase``, ``step`` (the program step as heard:
+0 before the first ramp, then one more per ramp and per hold — a load cycle's
+ramps and holds told apart), then ``<channel>_<unit>`` and
 ``<channel>_raw`` per channel, then ``event`` — every command and event heard,
 on the first row written at or after it. The columns are fixed by the first
 row: the press file's channels and any other the stream carried then.
@@ -35,7 +37,6 @@ from pathlib import Path
 from typing import TextIO
 
 from presscontroller.monitor.tracker import Monitor, TestRecord
-from presscontroller.protocol import rate_text
 
 
 def format_value(v: float | None) -> str:
@@ -116,7 +117,7 @@ class TestCsv:
                 self._events += 1
             wall = test.started + timedelta(seconds=t)
             row = [f"{t:.3f}", wall.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3],
-                   str(test.counter[i]), test.phase[i]]
+                   str(test.counter[i]), test.phase[i], str(test.steps[i])]
             for idx in self.indices:
                 col = test.raw.get(idx)
                 raw = col[i] if col is not None else None
@@ -135,24 +136,7 @@ class TestCsv:
             self._head()
         lines = [f"{t:.3f} s {text}" for t, text in test.events[self._events:]]
         self._events = len(test.events)
-        if test.ramp is not None:
-            r = test.ramp
-            ch = press.channel(r.channel)
-            decoded = monitor.ramp_decoded(test)
-            lines.append(f"ramp sent: channel {r.channel}"
-                         + (f" ({ch.name})" if ch else "")
-                         + f", speed {r.speed}, start {r.start}, end {r.end}, field4 {r.field4}"
-                         + (f" = {rate_text(r.rate, ch.unit)} from {r.start_value:g} to "
-                            f"{r.end_value:g} {ch.unit} (thousandths of {ch.unit})"
-                            if decoded else " (units not decoded for this channel)")
-                         + (f"; piston at {test.ramp_from_mm:.3f} mm when sent"
-                            if test.ramp_from_mm is not None else ""))
-        if test.ramp_mm_min is not None:
-            lines.append(f"ramp measured: {test.ramp_mm_min:.3f} mm/min over "
-                         f"{test.ramp_seconds:.1f} s (least squares, path against time)")
-        if test.ramp_kn_s is not None:
-            lines.append(f"ramp measured: {test.ramp_kn_s:.3f} kN/s over "
-                         f"{test.ramp_seconds:.1f} s (least squares, force against time)")
+        lines += test.past_ramps + monitor.ramp_summary(test)
         peak = monitor.peak(test)
         if peak is not None:
             f, t, p = peak
@@ -179,9 +163,9 @@ class TestCsv:
                          else f"channel {idx}: not in the press file, raw counts only")
         if self.source:
             lines.append(f"heard from: {self.source}")
-        lines.append("the ramp, its measured rate and the peak follow the table")
+        lines.append("each ramp, its measured rate and the peak follow the table")
         self._comments(lines)
-        cols = ["t_s", "time", "counter", "phase"]
+        cols = ["t_s", "time", "counter", "phase", "step"]
         for idx in self.indices:
             ch = press.channel(idx)
             name = f"{ch.name}_{ch.unit}" if ch else f"ch{idx}"

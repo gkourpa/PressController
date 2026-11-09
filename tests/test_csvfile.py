@@ -26,7 +26,8 @@ def test_the_real_test_as_csv(press, tmp_path):
     text = path.read_text(encoding="utf-8")
     assert "nan" not in text.lower()
     assert len(rows) == len(test.t)
-    assert list(rows[0])[:6] == ["t_s", "time", "counter", "phase", "Force_kN", "Force_raw"]
+    assert list(rows[0])[:7] == ["t_s", "time", "counter", "phase", "step", "Force_kN",
+                                "Force_raw"]
     assert max(float(r["Force_kN"]) for r in rows) == pytest.approx(1515.88, abs=0.01)
     # Every value can be taken back to the count the controller sent.
     for r in rows[::200]:
@@ -75,3 +76,14 @@ def test_a_streamed_test_matches_the_whole_one_and_grows_row_by_row(press, tmp_p
     head = lines[:lines.index(next(ln for ln in lines if ln.startswith("t_s,")))]
     assert head[0] == "# PressController test 1"
     assert not any("peak force" in ln or "ramp sent" in ln for ln in head)
+
+
+def test_a_load_cycle_as_csv_tells_its_steps_apart(press, tmp_path):
+    from tests.conftest import FORCE_CYCLE
+    m, _ = replay_all(press, FORCE_CYCLE)
+    path = write_test_csv(m, m.tests[0], tmp_path)
+    comments, rows = _read(path)
+    assert {r["step"] for r in rows if r["phase"] == "hold"} == {"2", "4"}
+    # Each ramp: what was sent, then its rate against path and against force.
+    assert [c.split(":")[0] for c in comments if c.startswith("# ramp")] == [
+        f"# ramp {n} {what}" for n in (1, 2, 3) for what in ("sent", "measured", "measured")]

@@ -65,6 +65,76 @@ MIN_START_LOAD, MAX_START_LOAD = 0.01, 1.0
 #: may go without one (operator, 2026-10-22: no rate never seen).
 MIN_INTERVAL_MS, MAX_INTERVAL_MS = 100, 500
 
+#: A program's step kinds (docs/motion.md, "Programs"): a force ramp, or a hold
+#: the program times itself (steps 36–38: Proteus answers ``#B02`` with
+#: ``#B26`` alone and the controller holds the force).
+STEP_KINDS = ("ramp", "hold")
+#: A hold's length, seconds.
+MIN_HOLD_S, MAX_HOLD_S = 1.0, 600.0
+#: Steps a program may have — far more than any cycle test needs, few enough
+#: that the dialog's list stays a list.
+MAX_STEPS = 200
+
+
+@dataclass(frozen=True)
+class ProgramStep:
+    """One step of a program: a ramp, or a hold of ``hold_s`` where the ramp
+    before it ended.
+
+    A ramp has its own **control** (steps 39–41: Path and Force ramps in one
+    Proteus test). **Force**: to ``end_kn`` at ``speed_kn_s``, up or down from
+    wherever the step before ended. **Path**: at ``speed_mm_min``, either *to*
+    the position ``path_mm``, or — ``path_relative`` — *by* ``path_mm``
+    (signed), from the previous ramp's set end when that ramp was a Path ramp,
+    else from where the piston is when the ramp is sent: Proteus' own reading
+    of its template's "+4 mm" and "−2 mm" (steps 39–41).
+
+    ``break_on`` on a ramp switches break detection on for it and every step
+    after: switching it off mid-test (``#B32`` during a test) was never
+    recorded, so a program never does."""
+
+    kind: str = "ramp"
+    end_kn: float = 100.0
+    speed_kn_s: float = 2.0
+    hold_s: float = 10.0
+    break_on: bool = False
+    control: str = "force"
+    path_mm: float = 100.0
+    path_relative: bool = False
+    speed_mm_min: float = 2.0
+
+    def problems(self) -> list[str]:
+        if self.kind not in STEP_KINDS:
+            return [f"step kind {self.kind!r} is not one of {', '.join(STEP_KINDS)}"]
+        if self.kind == "hold":
+            if not MIN_HOLD_S <= self.hold_s <= MAX_HOLD_S:
+                return [f"a hold of {self.hold_s:g} s is outside "
+                        f"{MIN_HOLD_S:g}–{MAX_HOLD_S:g} s"]
+            return []
+        if self.control not in RAMP_CONTROLS:
+            return [f"ramp control {self.control!r} is not one of {', '.join(RAMP_CONTROLS)}"]
+        out = []
+        if self.control == "force":
+            if self.end_kn <= 0:
+                out.append(f"a ramp's end must be above zero, not {self.end_kn:g} kN")
+            if self.speed_kn_s <= 0:
+                out.append(f"a ramp's speed must be above zero, not {self.speed_kn_s:g} kN/s")
+            return out
+        if self.speed_mm_min <= 0:
+            out.append(f"a ramp's speed must be above zero, not {self.speed_mm_min:g} mm/min")
+        if self.path_relative and self.path_mm == 0:
+            out.append("a ramp by 0 mm would not move")
+        elif not self.path_relative and self.path_mm <= 0:
+            out.append(f"a ramp's end must be above zero, not {self.path_mm:g} mm")
+        return out
+
+
+#: The program until the operator makes one: one Path ramp, 2 mm/min to
+#: 100 mm, break detection on — the lab's template (steps 15–23) and the
+#: operator's break detection.
+DEFAULT_STEPS = (ProgramStep("ramp", control="path", path_mm=100.0, speed_mm_min=2.0,
+                             break_on=True),)
+
 
 def clamp_refresh_hz(hz: float) -> float:
     """``hz`` brought inside the accepted range: zero would stop the window
@@ -74,17 +144,19 @@ def clamp_refresh_hz(hz: float) -> float:
 
 @dataclass(frozen=True)
 class TemplateSettings:
-    """What Proteus' test template held, as this program's defaults.
+    """What Proteus' test template held, as this program's defaults, and the
+    **program**: what the test does after the start load.
 
     The lab's template's values are the defaults (operator's video,
     2026-10-20), except **break detection, on** (operator, 2026-10-19).
+
+    The program is a list of ramps — each Path or Force — and holds
+    (:class:`ProgramStep`), the load cycles of EN 12390-13 among them (steps
+    35–41). Break detection belongs to the program: from a chosen ramp on.
     """
 
     peak: bool = False
     """Peak detection (``#B31``/``#B30``) — the control window's Peak switch."""
-
-    break_detection: bool = True
-    """Break detection (``#B33``/``#B32``) — the Break detection switch."""
 
     break_threshold_per_mil: float = 10.0
     """Sent as ``#D21<× 10>`` right after break detection on (step 26)."""
@@ -92,16 +164,12 @@ class TemplateSettings:
     start_load_percent: float = 0.10
     """Of the force range; sent as ``#D09<× 100>`` (``#D0910`` = 0.10 % = 4 kN)."""
 
-    ramp_control: str = "path"
-    """``path`` or ``force`` — the ramp's controlled channel."""
-
-    path_speed_mm_min: float = 2.0
-    path_end_mm: float = 100.0
-    force_speed_kn_s: float = 2.0
-    force_end_kn: float = 100.0
+    steps: tuple[ProgramStep, ...] = DEFAULT_STEPS
+    """The program, in order."""
 
     measuring_interval_ms: int = 200
-    """The stream's interval during the ramp; sent as ``#D05<÷ 10>``."""
+    """The stream's interval during the program; sent as ``#D05<÷ 10>`` before
+    every ramp, as Proteus does."""
 
     idle_interval_ms: int = 100
     """The stream's interval before the ramp -- idle and the approach. The
@@ -117,21 +185,33 @@ class TemplateSettings:
         if not MIN_START_LOAD <= self.start_load_percent <= MAX_START_LOAD:
             out.append(f"start load {self.start_load_percent:g} % is outside "
                        f"{MIN_START_LOAD:g}–{MAX_START_LOAD:g} % of the force range")
-        if self.ramp_control not in RAMP_CONTROLS:
-            out.append(f"ramp control {self.ramp_control!r} is not one of "
-                       f"{', '.join(RAMP_CONTROLS)}")
-        for name, value in (("path speed", self.path_speed_mm_min),
-                            ("path end", self.path_end_mm),
-                            ("force speed", self.force_speed_kn_s),
-                            ("force end", self.force_end_kn)):
-            if value <= 0:
-                out.append(f"{name} must be above zero, not {value:g}")
+        out += steps_problems(self.steps)
         for name, ms in (("measuring interval", self.measuring_interval_ms),
                          ("measuring interval before the ramp", self.idle_interval_ms)):
             if not MIN_INTERVAL_MS <= ms <= MAX_INTERVAL_MS or ms % 10:
                 out.append(f"{name} {ms} ms is not a multiple of 10 ms within "
                            f"{MIN_INTERVAL_MS}–{MAX_INTERVAL_MS} ms")
         return out
+
+
+def steps_problems(steps: tuple[ProgramStep, ...]) -> list[str]:
+    """What makes ``steps`` no program at all, in words: the checks that need
+    no press file. Those that do — a ramp's speed against ``[limits]``, its end
+    against the range, an unload break detection would read as a break — are
+    the control package's (:mod:`presscontroller.control.program`)."""
+    if not steps:
+        return ["the program has no steps"]
+    out = []
+    if len(steps) > MAX_STEPS:
+        out.append(f"the program has {len(steps)} steps, more than {MAX_STEPS}")
+    if steps[0].kind != "ramp":
+        # The start load is the wait before the first ramp (CONTINUE), and a
+        # hold is what follows a ramp's end: one before any ramp has no meaning
+        # on the line.
+        out.append("the program must start with a ramp")
+    for n, step in enumerate(steps, 1):
+        out += [f"step {n}: {p}" for p in step.problems()]
+    return out
 
 
 @dataclass(frozen=True)
@@ -200,23 +280,36 @@ class Settings:
             "# What control mode sends at START: Proteus' test template, as defaults.",
             "[test]",
             f"peak = {toml_value(t.peak)}",
-            f"break_detection = {toml_value(t.break_detection)}",
             f"break_threshold_per_mil = {toml_value(t.break_threshold_per_mil)}",
             f"start_load_percent = {toml_value(t.start_load_percent)}",
-            f"ramp_control = {toml_value(t.ramp_control)}",
-            f"path_speed_mm_min = {toml_value(t.path_speed_mm_min)}",
-            f"path_end_mm = {toml_value(t.path_end_mm)}",
-            f"force_speed_kn_s = {toml_value(t.force_speed_kn_s)}",
-            f"force_end_kn = {toml_value(t.force_end_kn)}",
             f"measuring_interval_ms = {toml_value(t.measuring_interval_ms)}",
             f"idle_interval_ms = {toml_value(t.idle_interval_ms)}",
             "",
+            "# The program, step by step: a Force ramp (end_kn at speed_kn_s), a Path ramp",
+            "# (to path_mm, or by path_mm when path_relative, at speed_mm_min), or a hold.",
+            *[line for step in t.steps for line in _step_toml(step)],
             "# The force-displacement plot. An axis range left out is fitted to the data.",
             "[plot]",
             *([f"xlim = {toml_value(list(self.plot.xlim))}"] if self.plot.xlim else []),
             *([f"ylim = {toml_value(list(self.plot.ylim))}"] if self.plot.ylim else []),
             f"colour = {toml_value(self.plot.colour)}",
         ]) + "\n"
+
+
+def _step_toml(step: ProgramStep) -> list[str]:
+    if step.kind == "hold":
+        return ["[[test.steps]]", 'kind = "hold"', f"hold_s = {toml_value(step.hold_s)}", ""]
+    if step.control == "path":
+        return ["[[test.steps]]", f"kind = {toml_value(step.kind)}", 'control = "path"',
+                f"path_mm = {toml_value(step.path_mm)}",
+                f"path_relative = {toml_value(step.path_relative)}",
+                f"speed_mm_min = {toml_value(step.speed_mm_min)}",
+                f"break_on = {toml_value(step.break_on)}", ""]
+    return ["[[test.steps]]", f"kind = {toml_value(step.kind)}",
+            f"control = {toml_value(step.control)}",
+            f"end_kn = {toml_value(step.end_kn)}",
+            f"speed_kn_s = {toml_value(step.speed_kn_s)}",
+            f"break_on = {toml_value(step.break_on)}", ""]
 
 
 def settings_path() -> Path:
@@ -240,6 +333,33 @@ def default_data_dir() -> Path:
 
 
 _TEST_KEYS = {f.name for f in fields(TemplateSettings)}
+_STEP_KEYS = {f.name for f in fields(ProgramStep)}
+
+
+def _read_steps(table: dict, where: str) -> tuple[ProgramStep, ...]:
+    """``[[test.steps]]``; raises :class:`ConfigError` for one that cannot be
+    read, and the whole program then falls back to its default."""
+    raw = table.get("steps", None)
+    if raw is None:
+        return DEFAULT_STEPS
+    if not isinstance(raw, list) or not all(isinstance(s, dict) for s in raw):
+        raise ConfigError(f"{where}: test.steps must be a list of tables")
+    d = ProgramStep()
+    out = []
+    for n, s in enumerate(raw, 1):
+        at = f"{where} test.steps[{n}]"
+        if extra := sorted(set(s) - _STEP_KEYS):
+            raise ConfigError(f"{at}: unknown key {extra[0]}")
+        out.append(ProgramStep(kind=get_str(s, "kind", d.kind, at),
+                               end_kn=get_float(s, "end_kn", d.end_kn, at),
+                               speed_kn_s=get_float(s, "speed_kn_s", d.speed_kn_s, at),
+                               hold_s=get_float(s, "hold_s", d.hold_s, at),
+                               break_on=get_bool(s, "break_on", d.break_on, at),
+                               control=get_str(s, "control", d.control, at),
+                               path_mm=get_float(s, "path_mm", d.path_mm, at),
+                               path_relative=get_bool(s, "path_relative", d.path_relative, at),
+                               speed_mm_min=get_float(s, "speed_mm_min", d.speed_mm_min, at)))
+    return tuple(out)
 
 
 def _read_test(data: dict, where: str) -> tuple[TemplateSettings, list[str]]:
@@ -253,6 +373,13 @@ def _read_test(data: dict, where: str) -> tuple[TemplateSettings, list[str]]:
         notes.append(f"{where}: unknown key test.{key} ignored")
     for f in fields(TemplateSettings):
         default = getattr(defaults, f.name)
+        if f.name == "steps":
+            try:
+                values[f.name] = _read_steps(table, where)
+            except ConfigError as exc:
+                notes.append(f"{exc}; using the default program")
+                values[f.name] = default
+            continue
         try:
             if isinstance(default, bool):
                 v = get_bool(table, f.name, default, where)

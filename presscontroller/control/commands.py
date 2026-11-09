@@ -105,6 +105,9 @@ class Limits:
     path_range_mm: float
     max_force_kn_s: float
     max_path_mm_min: float
+    resolution: int = 600000
+    """Counts per range (``DIGIMAXXResolution``): a stream count × range /
+    resolution is the value."""
 
     @classmethod
     def from_press(cls, press: PressConfig) -> "Limits | None":
@@ -115,7 +118,26 @@ class Limits:
                 or press.max_path_rate_mm_min is None):
             return None
         return cls(force.index, path.index, force.range, path.range,
-                   press.max_force_rate_kn_s, press.max_path_rate_mm_min)
+                   press.max_force_rate_kn_s, press.max_path_rate_mm_min, press.resolution)
+
+    def path_mm(self, raw: int) -> float:
+        """A stream count of the Path channel, in mm."""
+        return raw * self.path_range_mm / self.resolution
+
+    def speed_problem(self, control: str, speed: float) -> str | None:
+        """Why ``speed`` (mm/min for Path, kN/s for Force) may not be sent, or
+        ``None`` — the same rounding and limit the ramp's line is checked with."""
+        if control == "path":
+            units, channel = round(speed * 1000 / 60), self.path_channel
+            told = f"{speed:g} mm/min (limit {self.max_path_mm_min:g} mm/min)"
+        else:
+            units, channel = round(speed * 1000), self.force_channel
+            told = f"{speed:g} kN/s (limit {self.max_force_kn_s:g} kN/s)"
+        if units < 1:
+            return f"{told}: the speed rounds to zero"
+        if units > self.max_speed(channel):
+            return f"{told}: faster than the press file's [limits]"
+        return None
 
     # In the ramp's own numbers: thousandths of the channel unit (per second).
     def max_speed(self, channel: int) -> int:

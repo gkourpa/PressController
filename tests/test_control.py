@@ -90,8 +90,9 @@ def test_connecting_replays_proteus_startup_byte_for_byte():
     fake = FakeController()
     s = _connected(fake)
     try:
-        # Proteus' start-up exactly, then the two switches set to their positions.
-        assert fake.written == proteus + ["#B30", "#B33"]
+        # Proteus' start-up exactly, then Peak as its switch stands and break
+        # detection off until a program's START sets it.
+        assert fake.written == proteus + ["#B30", "#B32"]
         assert s.replies == ["#O", "#D138.6", "#D104000", "#D140", "#D180"]
         assert fake.pc_mode and fake.streaming
     finally:
@@ -175,24 +176,24 @@ def test_keypad_stop_cancels_and_hands_the_keypad_back():
         s.close()
 
 
-def test_switches_start_at_the_controllers_defaults_and_are_set_on_connect():
+def test_connecting_sets_peak_and_break_detection_whatever_was_left():
+    # Step 37: break detection left on by the test before caught an unload.
     fake = FakeController()
-    fake.peak, fake.break_detection = True, False        # left so by an earlier session
+    fake.peak, fake.break_detection = True, True         # left so by an earlier session
     s = _session(fake)
     try:
-        assert s.peak is False and s.break_detection is True
+        assert s.peak is False
         s.connect()
         _run(s, lambda s: s.state is SessionState.CONNECTED)
-        assert fake.peak is False and fake.break_detection is True
+        assert fake.peak is False and fake.break_detection is False
     finally:
         s.close()
 
 
-def test_a_switch_flipped_before_connecting_waits_and_sends_nothing():
+def test_peak_flipped_before_connecting_waits_and_sends_nothing():
     fake = FakeController()
     s = _session(fake)
     try:
-        s.set_break_detection(False)
         s.set_peak(True)
         assert fake.written == []
         s.connect()
@@ -203,14 +204,14 @@ def test_a_switch_flipped_before_connecting_waits_and_sends_nothing():
         s.close()
 
 
-def test_a_switch_flipped_while_connected_is_sent_at_once():
+def test_peak_flipped_while_connected_is_sent_at_once():
     fake = FakeController()
     s = _connected(fake)
     try:
-        s.set_break_detection(False)
-        assert fake.written[-1] == "#B32" and not fake.break_detection
-        s.set_break_detection(True)
-        assert fake.written[-1] == "#B33" and fake.break_detection
+        s.set_peak(True)
+        assert fake.written[-1] == "#B31" and fake.peak
+        s.set_peak(False)
+        assert fake.written[-1] == "#B30" and not fake.peak
     finally:
         s.close()
 

@@ -7,6 +7,7 @@ line                    from        message
 ======================  ==========  ===============================================
 ``#D0<s><n>;0;f;1;p…``  controller  :class:`Sample` — the measurement stream
 ``#D1<text>``           controller  :class:`Reply` — a value asked for at start-up
+``#D07<text>``          controller  :class:`PeakValue` — the answer to ``#B34``
 ``#O``                  controller  :class:`Ack`
 ``#B<nn>``              either      :class:`Command` — a numbered command or event
 ``#D0<p><v>``           PC          :class:`SetParam` — one digit of parameter, value
@@ -149,6 +150,15 @@ class ReportLine:
 
 
 @dataclass(frozen=True)
+class PeakValue:
+    """``#D07<text>``: the controller's answer to ``#B34`` (``#D07+ 200.1``) —
+    the peak force in kN, display-formatted, by hypothesis: twice it sat just
+    above the stream's highest reading (steps 36, 38). Kept as text."""
+
+    text: str
+
+
+@dataclass(frozen=True)
 class Unknown:
     """A line no rule here covers, kept exactly as it arrived."""
 
@@ -156,7 +166,7 @@ class Unknown:
 
 
 Message = (Sample | Reply | Ack | Command | SetParam | Ramp | BreakThreshold | ReportLine
-           | Unknown)
+           | PeakValue | Unknown)
 
 #: The ramp channels whose units are confirmed: 0 (Force, N and N/s) and 1 (Path,
 #: µm and µm/s). A ramp on any other channel is kept, but its numbers are not read
@@ -177,6 +187,7 @@ def rate_text(per_s: float, unit: str) -> str:
 
 _SAMPLE = re.compile(r"#D0(\d)(\d+)((?:;-?\d+;-?\d+)+)")
 _REPLY = re.compile(r"#D1(.*)")
+_PEAK = re.compile(r"#D07(.*)")
 _COMMAND = re.compile(r"#B(\d\d)")
 _RAMP = re.compile(r"#D12(\d+);(-?\d+);(-?\d+);(-?\d+);(-?\d+)")
 _PARAM = re.compile(r"#D0(\d)(\d+)")
@@ -201,6 +212,8 @@ def parse(direction: str, text: str) -> Message:
             return Sample(int(m[1]), int(m[2]), dict(zip(nums[0::2], nums[1::2])))
         if m := _REPLY.fullmatch(text):
             return Reply(m[1])
+        if m := _PEAK.fullmatch(text):
+            return PeakValue(m[1])
         if m := _REPORT.fullmatch(text):
             return ReportLine(m[1], m[2])
     elif direction == PC_TO_CTRL:
@@ -230,7 +243,8 @@ COMMANDS: dict[tuple[str, int], Meaning] = {
     (PC_TO_CTRL, 21): Meaning("PC mode off", True),
     (PC_TO_CTRL, 22): Meaning("start the ramp", True),
     (PC_TO_CTRL, 23): Meaning("start the approach", True),
-    (PC_TO_CTRL, 26): Meaning("test finished (answer to ramp end)", False),
+    (PC_TO_CTRL, 26): Meaning("answer to ramp end: the force is held (#B17 after it ends "
+                              "the test)", True),
     (PC_TO_CTRL, 30): Meaning("peak detection off", True),
     (PC_TO_CTRL, 31): Meaning("peak detection on", True),
     (PC_TO_CTRL, 32): Meaning("break detection off", True),
@@ -240,7 +254,7 @@ COMMANDS: dict[tuple[str, int], Meaning] = {
     (PC_TO_CTRL, 40): Meaning("start-up query", False),
     (PC_TO_CTRL, 41): Meaning("start-up command", False),
     (PC_TO_CTRL, 24): Meaning("machine switching (Proteus' program; never seen)", False),
-    (PC_TO_CTRL, 34): Meaning("unknown (Proteus' program; never seen)", False),
+    (PC_TO_CTRL, 34): Meaning("asks for the peak force (answered #D07; steps 36, 38)", False),
     (PC_TO_CTRL, 38): Meaning("ramp halted (Proteus' program; never seen)", False),
     (PC_TO_CTRL, 47): Meaning("START pressed: arm the test", True),
     (PC_TO_CTRL, 60): Meaning("unknown (Proteus' program; never seen)", False),
@@ -296,6 +310,8 @@ def describe(direction: str, msg: Message, units: dict[int, str] | None = None) 
                     f"{msg.start_value:g} to {msg.end_value:g} {unit}")
         case ReportLine(name, value):
             return "the controller's own report"
+        case PeakValue(text):
+            return f"peak force {text.strip()} kN?"
         case BreakThreshold():
             return f"break threshold {msg.per_mil:g} ‰"
         case Sample():

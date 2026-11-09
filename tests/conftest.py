@@ -33,6 +33,9 @@ PATH_120_LAG = DATA / "path_120mm_min_pause_lag.jsonl"
 PATH_2_PAUSE = DATA / "path_2mm_min_pause_resume.jsonl"
 #: Step 13: START with no specimen, then Cancel during the approach.
 DRY_RUN = DATA / "dryrun_start_cancel.jsonl"
+#: Step 38: a load cycle — 2 kN/s to 200 kN, hold 10 s, down to 100 kN, hold
+#: 10 s, break detection on, 4 kN/s to 250 kN; measuring interval 100 ms.
+FORCE_CYCLE = DATA / "force_cycle_two_holds.jsonl"
 
 
 @pytest.fixture(autouse=True)
@@ -71,3 +74,6 @@ def qapp():
     pytest.importorskip("PySide6")
     from PySide6.QtWidgets import QApplication
     yield QApplication.instance() or QApplication([])
+#: Step 41: Path 2 mm/min by +2 mm, hold 10 s, Path by -1 mm, hold 10 s, then
+#: break detection on and Force 2 kN/s to 50 kN — mixed controls in one test.
+PATH_AND_FORCE = DATA / "path_and_force_mixed.jsonl"

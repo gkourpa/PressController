@@ -14,11 +14,13 @@ presscontroller/
   monitor/   the Qt-free logic of the monitor: link state, test phases, each
              test's record (tracker.py), and a test as CSV (csvfile.py)
   control/   talking to the controller ourselves: the allowlist
-             (commands.py), the one port that writes (link.py), and the
-             connect / disconnect / keypad-STOP state machine (session.py);
-             Qt-free
+             (commands.py), the one port that writes (link.py), a test's
+             program planned and checked before a byte is sent (program.py),
+             and the connect / test / keypad-STOP state machine that runs it
+             step by step (session.py); Qt-free
   app/       the Qt window; plot.py draws to an ndarray (Qt-free), theme.py and
-             widgets.py come from DAqReader
+             widgets.py come from DAqReader; the program's dialog
+             (program_dialog.py) and its drawing (program_view.py)
 tools/       sniff.py, the bench sniffer the protocol was learnt with
 docs/        protocol notes, the tap's wiring (PDF and its generator), these topics
 examples/    press.example.toml, with placeholder ports

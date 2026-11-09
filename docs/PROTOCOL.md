@@ -371,6 +371,58 @@ Proteus' path ramps under load, for comparison: 10 mm/min ran at 2.23 (step 15, 
 3 at 2.33 (step 17), 2 at 2.09 (23), 1 at 1.11 (18); step 19 ran 10 at 9.77 on a specimen that hardly
 loaded. Whether the press also has a ceiling near 2.3 mm/min under load (step 17) is open.
 
+### Path and Force ramps in one test, 2026-11-09, `data/captures/20261109_163606_step41_path_and_force_mixed.jsonl`
+
+Proteus, a concrete cube directly on the platen (no EPS); template: start load 0.01 %, Path 2 mm/min
+**+2 mm**, hold 10 s, Path 2 mm/min **−1 mm**, hold 10 s, break identification on, Force 2 kN/s to
+50 kN; 100 ms.
+
+| t (s) | Line | Piston | Force |
+|---|---|---|---|
+| 133.3 | CTRL `#B01` | 63.86 mm | −0.1 → 12.8 kN (the overshoot after `#B01`) |
+| 140.3 | `#D0510` `#D1233;0;66696;0;1` `#B35` `#B22`, then CTRL **`#O#D0812703;…`** | 64.70 | 10.5 |
+| 202.5 | CTRL `#B02` → PC `#B26` | **66.700** | 158.5 |
+| hold | position held 66.700 → 66.693; the force relaxed 158 → 133 kN | | |
+| 212.6 | `#D0510` `#D1233;0;65696;0;1` `#B35` `#B22` `#O` | 66.69 | 133 |
+| 243.4 | CTRL `#B02` → PC `#B26` | 65.906 | 10.4 |
+| 253.5 | `#B33` `#D21100` `#D0510` `#D122000;0;50000;0;0` `#B35` `#B22` `#O` | 65.88 | 10.2 |
+| 273.1 | CTRL `#B02` → PC `#B26` `#B17` | 66.23 | 49.6 |
+| 274.5 | CTRL `#B27` → PC `#B36`, `#B37` 0.3 s later (no `#B34` this time) | | |
+
+- **Path ramps report their end, both ways** (`#B02`), and **`#B26` alone holds the position**
+  (7 µm in 10 s, the force relaxing at a fixed position). A Path ramp down unloads: 133 → 10 kN.
+  It stopped 0.21 mm short of its end at ~10 kN — near the ~11 kN the press settles at after
+  `#B01`; whether that is a floor of this setup is not known.
+- **Controls mix freely**: a Force ramp after Path ramps is the same lines as any Force ramp.
+- **Proteus' "+2 mm" / "−1 mm"**: the first Path ramp's end is the piston's position when it is
+  sent plus the distance (64.697 → 66.696); the next one's is the previous Path ramp's *set* end
+  plus the distance (66.696 → 65.696), not where the piston stopped. Steps 39 and 40 agree. What it
+  is counted from after a Force ramp was not recorded.
+- **New: the controller glued `#O` to a measurement line** with no terminator between —
+  `#O#D0812703;0;1582;1;388181;2;-26487` CR LF CR LF. Read as one line it is unknown, and this
+  program would have stopped the test at `#B22`. Fixed: a `#` mid-line starts a new line (every
+  message begins with `#`, none has one inside).
+
+### On EPS: a Path ramp down that did not lower, and a Force ramp that ended early, 2026-11-09, `data/captures/20261109_162612_step40_path_down_on_eps_force_lags.jsonl`
+
+A cube with EPS on it; Path 5 mm/min (`#D1283`) +4 mm (47.312 → `51309`), hold, −2 mm (`49309`),
+hold, break detection on, Force 4 kN/s to 50 kN. The operator: "a problem with the EPS, probably" —
+step 41, without it, ran as set.
+
+- The first ramp ended (`#B02`) at 51.304 mm. Through the hold and the whole ramp *down* the piston
+  kept **rising** at ~1.3–1.6 mm/min with the force flat at ~7 kN (the EPS creeping); the down
+  ramp's `#B02` came after 27.7 s — the time its *target* needed (2.26 mm at 5 mm/min, 27.1 s) —
+  at 52.18 mm.
+- **`#B02` is the ramp's target reaching its end, not the reading**: the Force ramp's `#B02` came
+  10.3 s after `#B22` — the 10.7 s its target needed from 7 to 50 kN — with the force at **10.4 kN**
+  (the EPS needed far more travel than the pump gave). Proteus answered `#B26 #B17` and the test
+  was over. Where the specimen follows the ramp, the two agree (step 38: 199.7 kN for 200).
+
+### On EPS, the first try, 2026-11-09, `data/captures/20261109_162310_step39_path_by_distance_on_eps.jsonl`
+
+Path 5 mm/min +4 mm (41.954 → `45954`), hold, −6 mm (`39954`, from the set end); the piston rose
+through the hold and the ramp down, as in step 40; cancelled by the operator.
+
 ### A complete load cycle: break detection off at START, on before the last ramp, 2026-11-09, `data/captures/20261109_145154_step38_cycle_complete_break_detection_off_then_on.jsonl`
 
 Proteus, step 37's template with a break identification element **unticked at the start** and the
@@ -662,7 +714,7 @@ validity question and "keep measuring" send nothing.
 | Code | From | Meaning | Status |
 |---|---|---|---|
 | `#B01` | CTRL | start load reached | confirmed |
-| `#B02` | CTRL | ramp end reached (force ramp at its end force), up or down | confirmed (step 21; ramp down step 36) |
+| `#B02` | CTRL | ramp end reached: the ramp's **target** at its end (the reading may lag), up or down, Force or Path | confirmed (step 21; down step 36; target, not reading, step 40; Path step 41) |
 | `#D07<value>` | CTRL | answer to `#B34`: `#D07+ 200.1` — the peak force in kN, display-formatted | hypothesis (steps 36, 38: each just above the stream's peak) |
 | `#B27` | CTRL | break detected (break detection on): the force fell by the threshold from its peak. After it the controller holds the load: the first Cancel stops the pump, a second Cancel releases the load (as do PC mode off and the keypad STOP) | confirmed at two cubes' failures (steps 32, 33; also steps 27, 29, 31 after a STOP) |
 | text lines (`DATE`, `IDENT`, … `BREAK`, `DEFORM`) | CTRL | the controller's own test report, sent on leaving PC mode during a test | seen once (step 31) |
@@ -674,7 +726,7 @@ validity question and "keep measuring" send nothing.
 | `#B20` / `#B21` | PC | PC mode on / off | `#B21` confirmed (step 24: `#B36 #B21` alone clears **PC** from the display and frees the keypad); `#B20` hypothesis |
 | `#B22` | PC | start the ramp | confirmed |
 | `#B23` | PC | start the approach | confirmed |
-| `#B26` | PC | answer to every `#B02`; alone, the controller holds the ramp's end force (a hold, timed by the PC); `#B26 #B17` ends the test | confirmed (step 36: held 10 s at 150 and 100 kN, then the next ramp) |
+| `#B26` | PC | answer to every `#B02`; alone, the controller holds the ramp's end force or position (a hold, timed by the PC); `#B26 #B17` ends the test | confirmed (step 36: held 10 s at 150 and 100 kN; step 41: a position) |
 | `#B30` / `#B31` | PC | peak detection off / on | confirmed (display PK) |
 | `#B32` / `#B33` | PC | break detection off / on | confirmed (display BD) |
 | `#B36` / `#B37` | PC | stream off / on | confirmed |
@@ -722,6 +774,9 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 - Whether `#B27` after the test's own Cancel (steps 34, 36) is always the unloading tripping break detection.
 - Whether break detection's state also survives a controller power-cycle (the notes say BD is on after power-up) — it survives a test's end and a Proteus restart (step 37).
 - Whether `#D07` is the peak force: compare with Proteus' result screen.
+- What Proteus counts a Path ramp's "+n mm" from when the ramp before it was a Force ramp (this
+  program uses the piston's position then); steps 39–41 only had Path ramps first.
+- Why the Path ramp down of step 41 stopped at ~10 kN, 0.21 mm short of its end.
 - After a `#B27` during a ramp and Proteus' single `#B17` (steps 35, 37), whether the load stayed held.
 - Whether the first ramp of the day is always slow (steps 15, 27, 34; in 34 it caught up at 19 kN/s), and whether a warm-up run (pump on, a few minutes, or one ramp without a specimen) prevents it.
 - Whether a path ramp under load is limited near 2.3 mm/min (step 17: 3 set, 2.33 measured).
