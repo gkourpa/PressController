@@ -23,9 +23,9 @@ Two kinds of line, both checked by :func:`check` at the one place a byte leaves
   ``#D21<n>``                               break threshold n × 0.1 ‰, n = 10–1000
   ========================================  ==========================================
 
-What Proteus' program can send but no recording has shown — ``#B24``, ``#B34``,
+What Proteus' program can send but no recording has shown — ``#B24``,
 ``#B38``, ``#B60``, ``#D160``, ``#D161``, Deformation control — is not here
-(:data:`NEVER`).
+(:data:`NEVER`), nor ``#B34``, seen in steps 36 and 38 with its meaning unconfirmed.
 """
 
 from __future__ import annotations

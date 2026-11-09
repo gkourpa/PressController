@@ -170,6 +170,16 @@ start** to add later (2026-10-20), each after its own Proteus recording, as the
 break threshold was learnt (step 26). Nothing is sent for an element before a
 recording shows its lines.
 
+**Load cycles (EN 12390-13), first recordings 2026-11-09** (steps 35, 36 in
+docs/PROTOCOL.md): a ramp up, a hold, a ramp down and a hold need no new line.
+A ramp down is `#D12…` with an end below the force; every ramp end is `#B02`,
+answered `#B26` alone to hold; the program times the hold, then sends the next
+ramp as CONTINUE does; `#B26 #B17` only at the last. Break detection must be off
+while unloading by more than its threshold (40 kN at 10 ‰ tripped it, step 35);
+switched on before the last ramp, it counts from then (step 36). The controller
+keeps its last state across tests, so START must send `#B32` explicitly (step 37).
+Step 38 ran the whole cycle so, to 250 kN, without a false break.
+
 ## Not in this milestone
 
 Software break detection of our own (the controller's is used), test templates

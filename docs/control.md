@@ -63,8 +63,9 @@ off and PC mode off (`#B36 #B21`) and nothing else.
   break threshold `#D21…`.
 
 **Never**: what Proteus' program can send but no recording has shown (`#B24`,
-`#B34`, `#B38`, `#B60`, `#B04`, `#B11`, `#D160`, `#D161`) and Deformation
-control. Tests assert each is refused at the write point.
+`#B38`, `#B60`, `#B04`, `#B11`, `#D160`, `#D161`), `#B34` (seen in steps 36 and
+38, meaning unconfirmed) and Deformation control. Tests assert each is refused at
+the write point.
 
 ## A test
 

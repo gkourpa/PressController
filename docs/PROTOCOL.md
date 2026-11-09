@@ -371,6 +371,114 @@ Proteus' path ramps under load, for comparison: 10 mm/min ran at 2.23 (step 15, 
 3 at 2.33 (step 17), 2 at 2.09 (23), 1 at 1.11 (18); step 19 ran 10 at 9.77 on a specimen that hardly
 loaded. Whether the press also has a ceiling near 2.3 mm/min under load (step 17) is open.
 
+### A complete load cycle: break detection off at START, on before the last ramp, 2026-11-09, `data/captures/20261109_145154_step38_cycle_complete_break_detection_off_then_on.jsonl`
+
+Proteus, step 37's template with a break identification element **unticked at the start** and the
+ticked one before the last ramp; 100 ms. Proteus started at 19.5 s.
+
+| t (s) | Line | Force | |
+|---|---|---|---|
+| 20.4 | `#B47` `#O` `#B30` **`#B32`** `#D091` `#B23` | | START, break detection off |
+| 24.0 | CTRL `#B01` | 1.0 kN | start load |
+| 53.1 | `#D0510` `#D122000;0;200000;0;0` `#B35` `#B22` `#O` | 9.6 | ramp up; 2.00 kN/s |
+| 150.2 | CTRL `#B02` → PC `#B26` | 199.7 | hold: 199.79–200.13 kN |
+| 160.2 | `#D0510` `#D122000;0;100000;0;0` `#B35` `#B22` `#O` | 200.0 | 10.0 s later, ramp down; −1.96 kN/s, **no `#B27`** |
+| 211.3 | CTRL `#B02` → PC `#B26` | 100.2 | hold: 99.75–100.06 kN |
+| 221.4 | `#B33` `#D21100` `#D0510` `#D124000;0;250000;0;0` `#B35` `#B22` `#O` | 99.9 | 10.0 s later: break detection on, ramp 4 kN/s to 250 kN; ran 3.96 kN/s |
+| 259.4 | CTRL `#B02` → PC `#B26` `#B17` | 249.6 | test over; 250 → 13 kN in 1.4 s |
+| 259.7 | CTRL `#B27` → PC `#B36`; 1.0 s later `#B34` → **`#D07+ 250.4`**, `#B37` | 199.5 | as step 36 |
+
+The whole cycle as designed: `#B32` at START kept the 100 kN unload from tripping; `#B33` at 100 kN
+did not trip either (counts from then, as step 36). `#D07+ 250.4` against the stream's highest reading
+250.01 kN (100 ms samples) — the second time `#D07` sits just above the stream's peak. The capture
+stopped 11 s after `#B17`, before `#B43`.
+
+### A load cycle at 100 ms, break detection left on, 2026-11-09, `data/captures/20261109_144426_step37_cycle_100ms_break_detection_left_on.jsonl`
+
+Proteus, the template changed by the operator: measuring distance 100 ms, the first ramp straight to
+200 kN, and **no break identification element at the start**. Proteus started at 19.4 s.
+
+| t (s) | Line | Force | |
+|---|---|---|---|
+| 21.0 | `#B47` `#O` `#B30` `#D091` `#B23` | | START: no `#B32`/`#B33` |
+| 24.7 | CTRL `#B01` | 0.59 kN | start load |
+| 41.5 | `#D0510` `#D122000;0;200000;0;0` `#B35` `#B22` `#O` | 11.9 | ramp up |
+| 137.5 | CTRL `#B02` → PC `#B26` | 199.8 | hold (peak 200.13 kN) |
+| 147.5 | `#D0510` `#D122000;0;100000;0;0` `#B35` `#B22` `#O` | 199.9 | 10.0 s later, ramp down |
+| 168.1 | CTRL **`#B27`** → PC `#B36` `#B17` | 160.2 | Proteus: **"TEST INTERRUPTED"**; then silence, no `#B43` |
+
+The fall at `#B27`: 200.13 → 160.23 = **39.9 kN**, as step 35. Break detection was on although this
+test never sent `#B33`: the previous test (step 36) had switched it on, and nothing switched it off —
+**the controller keeps break detection's last state across tests and Proteus restarts**, and Proteus
+sends `#B32`/`#B33` only when the template has a break identification element at the start. Proteus'
+"TEST INTERRUPTED" is its answer to `#B27` during a ramp. The 100 ms stream ran without a gap (counter
++10 per frame): the measuring distance was not the cause, here or (most likely) in the operator's
+earlier 100 ms run. Fix: a break identification element, unticked, at the template's start (`#B32`
+at START), and the ticked one before the last ramp.
+
+### A load cycle with two holds, break detection on before the last ramp, 2026-11-09, `data/captures/20261109_142919_step36_cycle_two_holds_break_detection_mid_test.jsonl`
+
+Proteus, the first try at an EN 12390-13-style cycle (the same template as step 35, break
+identification moved to just before the last ramp). Proteus restarted at 73.6 s (start-up as always,
+`#D0510` included). The template's 3 kN/s for the last ramp and 12 s for the second hold were not
+saved, so both ran as 2 kN/s and 10 s (operator).
+
+| t (s) | Line | Force | |
+|---|---|---|---|
+| 75.5 | `#B47` `#O` `#B30` `#D091` `#B23` | | START: **no `#B32`/`#B33` at all**, the break element being later; start load 0.01 % → `#D091` |
+| 203.6 | CTRL `#B01` | 0.13 kN | start load |
+| 213.9 | `#D0520` `#D122000;0;150000;0;0` `#B35` `#B22` `#O` | 11.6 | ramp up; ran 1.98 kN/s |
+| 284.4 | CTRL `#B02` → PC `#B26` **alone** | 149.5 | ramp end; the force **held** at 149.86–150.11 kN |
+| 294.4 | `#D0520` `#D122000;0;100000;0;0` `#B35` `#B22` `#O` | 149.9 | **10.0 s** after `#B26`: the ramp *down*, same form, end below the force; ran −1.96 kN/s |
+| 320.0 | CTRL `#B02` → PC `#B26` | 100.2 | the ramp down reports its end too; held at 99.71–100.2 kN |
+| 330.1 | **`#B33` `#D21100`** `#D0520` `#D122000;0;200000;0;0` `#B35` `#B22` `#O` | 100.0 | 10.0 s later: break detection on, in one burst with the last ramp; ran 1.96 kN/s |
+| 381.1 | CTRL `#B02` → PC `#B26` `#B17` | 199.7 | ramp end, test over |
+| 381.5 | CTRL `#B27` → PC `#B36` | 193.1 | the unloading tripped break detection (as step 34) |
+| 382.5 | PC **`#B34`** → CTRL **`#D07+ 200.1`**, PC `#B37` | | new on the line |
+| 401.6 | CTRL `#B43` | 0.59 | 193 → 14 kN within 1.1 s of `#B17` |
+
+- **A hold is Proteus' timer, not a controller command.** `#B02` answered by `#B26` alone leaves the
+  controller holding the ramp's end force; after the hold time Proteus sends the next ramp exactly as
+  CONTINUE does (`#D0520`, `#D12…`, then `#B22` after `#B35`). Only the last `#B02` gets `#B17`. So
+  `#B26` is **not** "test finished": it answers every ramp end; `#B17` ends the test.
+- **Break detection switched on mid-test measures from then.** At `#B33` the force was 100 kN, 50 kN
+  below the test's 150.11 kN peak, more than the 40 kN threshold, and no `#B27` came.
+- **Break detection was off during the 50 kN unload**, although START sent neither `#B32` nor `#B33`
+  and step 35, the previous recorded session, had left it on (`#B33`). The six minutes between the two
+  captures were not recorded; step 37 shows the state survives a test's end and a Proteus restart, so
+  most likely something in that gap (a BR click, a test without a recording) switched it off.
+- **`#B34` → `#D07+ 200.1`** (first time on the line; until now known only from Proteus' program):
+  Proteus' break handling — stream off, `#B34` 1.0 s later, answered in 11 ms, stream on. 200.1 kN is
+  just above the stream's highest reading (199.72 kN, 200 ms samples) — the controller's **peak force**,
+  in kN, display-formatted. Hypothesis: Proteus' result screen would confirm it.
+- **The stream stayed at 200 ms after the test** (counter +20 per frame): Proteus sent no `#D05…`
+  after it — step 34's open point.
+
+### A load cycle, the unload tripping break detection, 2026-11-09, `data/captures/20261109_141748_step35_cycle_unload_trips_break_detection.jsonl`
+
+Proteus, template: start load 0.01 %, break identification on (10 ‰), Force 2 kN/s to 150 kN, hold
+10 s, Force 2 kN/s down to 100 kN, hold, Force up to 200 kN; measuring distance 200 ms. Proteus
+started at 34.4 s (start-up as always).
+
+| t (s) | Line | Force | |
+|---|---|---|---|
+| 39.7 | `#B47` `#O` `#B30` **`#B33` `#D21100`** `#D091` `#B23` | | START, break detection on at 10 ‰ |
+| 212.8 | CTRL `#B01` | 0.15 kN | start load |
+| 229.0 | `#D0520` `#D122000;0;150000;0;0` `#B35` `#B22` `#O` | 11.9 | ramp up; 1.97 kN/s |
+| 299.4 | CTRL `#B02` → PC `#B26` | 149.8 | hold at ~149.9 kN (peak 150.05) |
+| 309.5 | `#D0520` `#D122000;0;100000;0;0` `#B35` `#B22` `#O` | 149.9 | 10.0 s later, ramp down; −1.93 kN/s |
+| 330.0 | CTRL **`#B27`** → PC `#B36` `#B17` | 110.6 | "break"; Proteus cancels; then silence: no `#B43`, no `#B37` |
+
+The fall from the peak was **39.9 kN** (150.05 → 110.15) at `#B27`: 10 ‰ of the 4000 kN range is
+40 kN. The clearest evidence yet that break detection fires on a drop of threshold × range from the
+peak (steps 27, 29 were near 40 kN too). **A cycle that unloads by more than the threshold needs break
+detection off during the unload** — EN 12390-13 cycles unload by far more. Whether the load stayed
+held after this single `#B17` (as steps 32, 33) was not recorded.
+
+The operator's `****OVERFLOW*DE*` on the LCD (on entering the test screen, both runs) sends nothing on
+the line. The deformation channel read a fixed −0.2256 mm throughout: likely channel 2 with nothing
+fitted (hypothesis).
+
 ### The press PC's first run: a force ramp to its end, 2026-10-22, `data/captures/20261022_122625_step34_force_ramp_300kN_press_pc.jsonl`
 
 The installed program on the press PC (COM4), control mode, break detection on (10 ‰), Force
@@ -512,7 +620,7 @@ fixed strings in the program, so the full list of `#B` codes it can ever send is
 | `#B38` | puts Proteus in its state "ramp halted"; reached from Cancel during a ramp under a condition not identified (every recorded Cancel sent `#B17`) | **no** |
 | `#B24` | machine switching ("Maschinenumschaltung", after a configurable wait); a multi-machine feature | **no** |
 | `#D160` / `#D161` | the same routine as `#B24`, when it does not send `#B24` | **no** |
-| `#B34` | an internal routine, purpose unknown | **no** |
+| `#B34` | an internal routine, purpose unknown | **twice** (steps 36, 38, after `#B27`: answered `#D07+ 200.1`, `#D07+ 250.4` — the peak?) |
 | `#B60` | an internal routine, purpose unknown | **no** |
 
 `#D` commands with run-time values are built elsewhere: `#D02<machine>` (we see `#D020`), `#D05<n>`
@@ -554,7 +662,8 @@ validity question and "keep measuring" send nothing.
 | Code | From | Meaning | Status |
 |---|---|---|---|
 | `#B01` | CTRL | start load reached | confirmed |
-| `#B02` | CTRL | ramp end reached (force ramp at its end force) | confirmed (step 21) |
+| `#B02` | CTRL | ramp end reached (force ramp at its end force), up or down | confirmed (step 21; ramp down step 36) |
+| `#D07<value>` | CTRL | answer to `#B34`: `#D07+ 200.1` — the peak force in kN, display-formatted | hypothesis (steps 36, 38: each just above the stream's peak) |
 | `#B27` | CTRL | break detected (break detection on): the force fell by the threshold from its peak. After it the controller holds the load: the first Cancel stops the pump, a second Cancel releases the load (as do PC mode off and the keypad STOP) | confirmed at two cubes' failures (steps 32, 33; also steps 27, 29, 31 after a STOP) |
 | text lines (`DATE`, `IDENT`, … `BREAK`, `DEFORM`) | CTRL | the controller's own test report, sent on leaving PC mode during a test | seen once (step 31) |
 | `#B28` | CTRL | keypad STOP pressed (in PC mode, not obeyed locally) | confirmed |
@@ -565,15 +674,16 @@ validity question and "keep measuring" send nothing.
 | `#B20` / `#B21` | PC | PC mode on / off | `#B21` confirmed (step 24: `#B36 #B21` alone clears **PC** from the display and frees the keypad); `#B20` hypothesis |
 | `#B22` | PC | start the ramp | confirmed |
 | `#B23` | PC | start the approach | confirmed |
-| `#B26` | PC | test finished, sent in answer to `#B02` | hypothesis (step 21) |
+| `#B26` | PC | answer to every `#B02`; alone, the controller holds the ramp's end force (a hold, timed by the PC); `#B26 #B17` ends the test | confirmed (step 36: held 10 s at 150 and 100 kN, then the next ramp) |
 | `#B30` / `#B31` | PC | peak detection off / on | confirmed (display PK) |
 | `#B32` / `#B33` | PC | break detection off / on | confirmed (display BD) |
 | `#B36` / `#B37` | PC | stream off / on | confirmed |
 | `#B47` | PC | START pressed (arm the test) | confirmed (Proteus' START handler sends it; the approach follows) |
-| `#B24` `#B34` `#B38` `#B60` `#D160` `#D161` | PC | in Proteus' program, never seen on the line (see above) | unknown — never to be sent |
+| `#B24` `#B38` `#B60` `#D160` `#D161` | PC | in Proteus' program, never seen on the line (see above) | unknown — never to be sent |
+| `#B34` | PC | asks for the peak? (steps 36, 38: answered `#D07+ 200.1`, `#D07+ 250.4`) | hypothesis — never to be sent until confirmed |
 | `#D05<n>` | PC | stream interval n × 10 ms — the template's ramp "Measur. dist." (200 ms → `#D0520`) | confirmed |
-| `#D09<n>` | PC | start load, n × 0.01 % of the force range (template "Start load 0.1000 %" → `#D0910` = 4 kN; `#B01` came at 3–4 kN in every test) | hypothesis, strongly supported |
-| `#D21<n>` | PC | break threshold, n × 0.1 ‰, sent right after `#B33` when the template's break identification is on | encoding confirmed (step 26: 10 ‰ → `#D21100`, 25 ‰ → `#D21250`); its effect on the controller not yet seen |
+| `#D09<n>` | PC | start load, n × 0.01 % of the force range (template "Start load 0.1000 %" → `#D0910` = 4 kN; `#B01` came at 3–4 kN in every test; 0.01 % → `#D091`, `#B01` at 0.13–0.15 kN, steps 35–36) | hypothesis, strongly supported |
+| `#D21<n>` | PC | break threshold, n × 0.1 ‰ of the range, sent right after `#B33`; `#B27` comes when the force has fallen that much from its peak since `#B33` | encoding confirmed (step 26: 10 ‰ → `#D21100`, 25 ‰ → `#D21250`); effect: 39.9 kN fall at 10 ‰ (step 35), counted from `#B33` (step 36) |
 | `#D12…` | PC | ramp: speed; start; end; 0; channel, in thousandths of the channel unit | confirmed for Path and Force |
 | `#B03 #B09 #B40 #B41 #B50–52 #D020` | PC | start-up / approach, replayed as recorded | unknown, accepted |
 
@@ -609,7 +719,10 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 - Which start-up command makes **PC** / **FO** appear on the controller display.
 - Meaning of display indicators ZB, (bottom) FO, LD.
 - What Proteus puts in the ramp's start field (0×, 1×, 2×, 0×, 0× the piston position in steps 15–19); it does not affect the speed (steps 17–19).
-- Whether `#B27` after the test's own Cancel (step 34) is always the unloading tripping break detection.
+- Whether `#B27` after the test's own Cancel (steps 34, 36) is always the unloading tripping break detection.
+- Whether break detection's state also survives a controller power-cycle (the notes say BD is on after power-up) — it survives a test's end and a Proteus restart (step 37).
+- Whether `#D07` is the peak force: compare with Proteus' result screen.
+- After a `#B27` during a ramp and Proteus' single `#B17` (steps 35, 37), whether the load stayed held.
 - Whether the first ramp of the day is always slow (steps 15, 27, 34; in 34 it caught up at 19 kN/s), and whether a warm-up run (pump on, a few minutes, or one ramp without a specimen) prevents it.
 - Whether a path ramp under load is limited near 2.3 mm/min (step 17: 3 set, 2.33 measured).
 - What limits a path ramp under load to about 2.3 mm/min (steps 15, 17); step 19 ran 10 mm/min without load.
@@ -617,6 +730,6 @@ Defaults after power-up: Peak **off**, break detection (BD) **on**. Meaning of Z
 - After a break (`#B27`), whether the controller would unload by itself if not sent `#B17`, how soon a second `#B17` may follow the first (10 s in step 33), and what Proteus does — a Proteus recording with break identification on, to failure, would show these.
 - Whether other keypad keys (START, ZERO, PEAK…) are forwarded like STOP (`#B28`) in PC mode.
 - Meaning of `#D0910`, controller `#B35`, `#B43`; what the `8` after `#D0` is.
-- What `#B34`, `#B38` and `#B60` do (in Proteus' program, never seen on the line).
+- What `#B38` and `#B60` do (in Proteus' program, never seen on the line), and whether `#B34` only asks for the peak.
 - What Peak and BR change inside the controller (stream looks the same).
 - Whether channel 3 (External, 250 kN) appears when active.
